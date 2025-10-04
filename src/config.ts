@@ -1,29 +1,59 @@
-import { validateSystem } from './configValidation';
+/**
+ * Web application configuration for MEXC trading terminal
+ */
 
-// Сырая конфигурация
+// Raw configuration for web application
 const rawConfig = {
-    // UID для авторизации (вставьте ваш UID из cookies браузера)
-    mexcUid: process.env.MEXC_UID || "",
-    // Базовый язык/локаль страницы — подберите под ваш интерфейс МEXC
-    mexcBaseUrl: "https://www.mexc.com",
-    // Путь страницы спота: /exchange/<SYMBOL>_USDT
-    spotPath: (symbol: string) => `/ru-RU/exchange/${symbol}_USDT`,
-    // Тайминги
-    pollMs: 1000,
-    headless: true,
-    // Настройки мониторинга
-    statusCheckInterval: 30000, // проверка статуса каждые 30 секунд
-    maxRetries: 3, // максимальное количество попыток
-    // Настройки логирования
-    logLevel: process.env.LOG_LEVEL || "info",
-    logToFile: process.env.LOG_TO_FILE !== "false",
-    // Настройки API
-    apiTimeout: 10000, // 10 секунд
-    apiRetries: 3,
-    // Настройки браузера
-    browserTimeout: 30000, // 30 секунд
-    pageLoadTimeout: 10000, // 10 секунд
+  // API Configuration
+  mexcKey: "",
+  mexcSecret: "",
+  
+  // MEXC Configuration
+  mexcBaseUrl: "https://api.mexc.com",
+  mexcWsUrl: "wss://wbs.mexc.com/ws",
+  
+  // Trading Configuration
+  defaultSymbol: "BTCUSDT",
+  defaultOrderType: "LIMIT",
+  defaultSide: "BUY",
+  
+  // API Configuration
+  apiTimeout: 10000, // 10 seconds
+  apiRetries: 3,
+  
+  // Rate Limiting Configuration
+  orderRateLimitPerMin: 30,
+  wsRateLimitPerMin: 120,
+  
+  // WebSocket Configuration
+  wsReconnectInterval: 5000, // 5 seconds
+  wsMaxReconnectAttempts: 10,
+  
+  // UI Configuration
+  updateInterval: 1000, // 1 second
+  maxOrderBookDepth: 20,
+  maxTradeHistory: 100,
 };
 
-// Валидированная конфигурация
-export const CONFIG = validateSystem(rawConfig);
+// Export configuration
+export const CONFIG = rawConfig;
+
+// Helper functions
+export const getApiConfig = () => {
+  if (CONFIG.mexcKey && CONFIG.mexcSecret) {
+    return {
+      apiKey: CONFIG.mexcKey,
+      secret: CONFIG.mexcSecret
+    };
+  }
+  return null;
+};
+
+export const setApiCredentials = (key: string, secret: string) => {
+  CONFIG.mexcKey = key;
+  CONFIG.mexcSecret = secret;
+};
+
+export const hasApiCredentials = (): boolean => {
+  return !!(CONFIG.mexcKey && CONFIG.mexcSecret);
+};

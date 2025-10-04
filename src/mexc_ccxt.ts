@@ -1,56 +1,47 @@
 import ccxt from "ccxt";
-import { log } from "./logger";
-import { errorHandler, AppError } from "./errorHandler";
 import { CONFIG } from "./config";
-import { backupManager } from "./backupStrategy";
 
 export class MexcApi {
   private ex: any;
+  
   constructor(opts?: { apiKey?: string; secret?: string }) {
     this.ex = new ccxt.mexc({
       apiKey: opts?.apiKey,
       secret: opts?.secret,
-      enableRateLimit: true
+      enableRateLimit: true,
+      timeout: CONFIG.apiTimeout,
+      sandbox: false, // Use production API
+    });
+
+    console.log("MexcApi initialized", {
+      hasApiKeys: !!(opts?.apiKey && opts?.secret),
+      timeout: CONFIG.apiTimeout
     });
   }
 
   async canTrade(symbol: string) {
     try {
-      await errorHandler.withTimeout(
-        this.ex.loadMarkets(),
-        CONFIG.apiTimeout,
-        "loadMarkets"
-      );
-      
+      await this.ex.loadMarkets();
       const marketExists = this.ex.markets[symbol + "/USDT"] ? true : false;
-      log.api("canTrade", symbol, marketExists ? 200 : 404);
+      console.log("canTrade", symbol, marketExists ? "available" : "not available");
       return marketExists;
     } catch (error) {
-      log.error("canTrade failed", { symbol, error: error instanceof Error ? error.message : String(error) });
-      errorHandler.handleApiError(error, "canTrade");
+      console.error("canTrade error:", error);
+      return false;
     }
   }
 
   async orderBook(symbol: string) {
     try {
-      const startTime = Date.now();
-      
-      const orderBook = await backupManager.executeWithFallback(
-        async () => {
-          return await errorHandler.withTimeout(
-            this.ex.fetchOrderBook(symbol + "/USDT", 50),
-            CONFIG.apiTimeout,
-            "fetchOrderBook"
-          );
-        }
-      );
-      
-      const duration = Date.now() - startTime;
-      log.api("orderBook", symbol, 200, duration);
+      const orderBook = await this.ex.fetchOrderBook(symbol + "/USDT", 50);
+      console.log("orderBook", symbol, {
+        bidsCount: orderBook.bids?.length || 0,
+        asksCount: orderBook.asks?.length || 0
+      });
       return orderBook;
     } catch (error) {
-      log.error("orderBook failed", { symbol, error: error instanceof Error ? error.message : String(error) });
-      errorHandler.handleApiError(error, "orderBook");
+      console.error("orderBook error:", error);
+      throw new Error(`Failed to fetch order book for ${symbol}`);
     }
   }
 
@@ -59,44 +50,56 @@ export class MexcApi {
       const pair = symbol + "/USDT";
       
       if (type === "limit" && price === undefined) {
-        throw new AppError("Price required for limit order", 400);
+        throw new Error("Price required for limit order");
       }
       
-      const startTime = Date.now();
-      const order = await errorHandler.withRetry(
-        async () => {
-          if (type === "market") {
-            return await this.ex.createOrder(pair, "market", side, amount);
-          } else {
-            return await this.ex.createOrder(pair, "limit", side, amount, price);
-          }
-        },
-        CONFIG.apiRetries,
-        1000,
-        "createOrder"
-      );
+      let order;
+      if (type === "market") {
+        order = await this.ex.createOrder(pair, "market", side, amount);
+      } else {
+        order = await this.ex.createOrder(pair, "limit", side, amount, price);
+      }
       
-      const duration = Date.now() - startTime;
-      log.trade("createOrder_success", symbol, { 
+      console.log("createOrder success", symbol, { 
         type, 
         side, 
         amount, 
         price, 
-        orderId: order.id,
-        duration 
+        orderId: order.id
       });
       
       return order;
     } catch (error) {
-      log.error("createOrder failed", { 
-        symbol, 
+      console.error("createOrder failed", symbol, { 
         type, 
         side, 
         amount, 
-        price, 
-        error: error instanceof Error ? error.message : String(error) 
+        price,
+        error: error instanceof Error ? error.message : String(error)
       });
-      errorHandler.handleApiError(error, "createOrder");
+      throw new Error(`Failed to create ${type} order for ${symbol}`);
+    }
+  }
+
+  async cancelOrder(orderId: string, symbol: string) {
+    try {
+      const result = await this.ex.cancelOrder(orderId, symbol + "/USDT");
+      console.log("cancelOrder success", { orderId, symbol });
+      return result;
+    } catch (error) {
+      console.error("cancelOrder failed", { orderId, symbol, error });
+      throw new Error(`Failed to cancel order ${orderId}`);
+    }
+  }
+
+  async fetchBalance() {
+    try {
+      const balance = await this.ex.fetchBalance();
+      console.log("fetchBalance success");
+      return balance;
+    } catch (error) {
+      console.error("fetchBalance failed", error);
+      throw new Error("Failed to fetch balance");
     }
   }
 }

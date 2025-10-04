@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-900 text-white font-mono;
+  }
+}
+
+@layer components {
+  .orderbook-row {
+    @apply flex items-center justify-between px-2 py-1 hover:bg-gray-800 cursor-pointer transition-colors duration-150;
+  }
+  
+  .orderbook-price {
+    @apply text-sm font-medium;
+  }
+  
+  .orderbook-amount {
+    @apply text-sm text-gray-300;
+  }
+  
+  .volume-bar {
+    @apply absolute inset-y-0 left-0 opacity-20 transition-all duration-300;
+  }
+  
+  .bid-volume-bar {
+    @apply bg-bid;
+  }
+  
+  .ask-volume-bar {
+    @apply bg-ask;
+  }
+  
+  .order-button {
+    @apply px-4 py-2 rounded font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900;
+  }
+  
+  .buy-button {
+    @apply bg-bid hover:bg-bid-hover focus:ring-bid text-white;
+  }
+  
+  .sell-button {
+    @apply bg-ask hover:bg-ask-hover focus:ring-ask text-white;
+  }
+  
+  .input-field {
+    @apply bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+  }
+}
