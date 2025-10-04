@@ -9,13 +9,34 @@ interface BrowserConnectionProps {
 export const BrowserConnection: React.FC<BrowserConnectionProps> = ({ 
   onConnectionStatus, 
   onOrderBookData,
-  currentTicker = 'BTCUSDT'
+  currentTicker = 'BTC_USDT'
 }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [connectionMethod, setConnectionMethod] = useState<'extension' | 'injection'>('extension');
   const [showInstructions, setShowInstructions] = useState(false);
   const [showTroubleshooting, setShowTroubleshooting] = useState(false);
   const [showConnectionMethod, setShowConnectionMethod] = useState(false);
+
+  // Функция для сворачивания других меню
+  const toggleMenu = (menuType: 'instructions' | 'troubleshooting' | 'connectionMethod') => {
+    // Сворачиваем все меню
+    setShowInstructions(false);
+    setShowTroubleshooting(false);
+    setShowConnectionMethod(false);
+    
+    // Открываем выбранное меню
+    switch (menuType) {
+      case 'instructions':
+        setShowInstructions(true);
+        break;
+      case 'troubleshooting':
+        setShowTroubleshooting(true);
+        break;
+      case 'connectionMethod':
+        setShowConnectionMethod(true);
+        break;
+    }
+  };
 
   // Проверка подключения
   useEffect(() => {
@@ -45,17 +66,27 @@ export const BrowserConnection: React.FC<BrowserConnectionProps> = ({
 
   // Открытие MEXC с правильным URL
   const openMexcInNewTab = () => {
-    const ticker = currentTicker || 'BTCUSDT';
+    const ticker = currentTicker || 'BTC_USDT';
+    // Используем правильный формат с нижним подчеркиванием
     const url = `https://www.mexc.com/ru-RU/exchange/${ticker}`;
     
     try {
-      const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
-      if (!newWindow) {
-        alert('Не удалось открыть новое окно. Проверьте блокировщик всплывающих окон.');
-      }
+      // Создаем ссылку для программного открытия
+      const link = document.createElement('a');
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      
+      // Добавляем в DOM и кликаем
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      console.log('MEXC opened:', url);
     } catch (error) {
       console.error('Error opening MEXC:', error);
-      alert('Ошибка при открытии MEXC. Проверьте настройки браузера.');
+      // Fallback - показываем ссылку пользователю
+      alert(`Не удалось открыть автоматически. Скопируйте ссылку: ${url}`);
     }
   };
 
@@ -90,19 +121,19 @@ export const BrowserConnection: React.FC<BrowserConnectionProps> = ({
         
         <div className="flex space-x-2">
           <button
-            onClick={() => setShowConnectionMethod(!showConnectionMethod)}
+            onClick={() => showConnectionMethod ? setShowConnectionMethod(false) : toggleMenu('connectionMethod')}
             className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm transition-colors"
           >
             {showConnectionMethod ? 'Скрыть' : 'Методы'} ▼
           </button>
           <button
-            onClick={() => setShowInstructions(!showInstructions)}
+            onClick={() => showInstructions ? setShowInstructions(false) : toggleMenu('instructions')}
             className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition-colors"
           >
             {showInstructions ? 'Скрыть' : 'Инструкции'} ▼
           </button>
           <button
-            onClick={() => setShowTroubleshooting(!showTroubleshooting)}
+            onClick={() => showTroubleshooting ? setShowTroubleshooting(false) : toggleMenu('troubleshooting')}
             className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-sm transition-colors"
           >
             {showTroubleshooting ? 'Скрыть' : 'Помощь'} ▼

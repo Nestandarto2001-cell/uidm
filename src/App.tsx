@@ -7,6 +7,7 @@ import { OrderForm } from './components/OrderForm';
 import { MyOrders } from './components/MyOrders';
 import { UserProfiles } from './components/UserProfiles';
 import { BrowserConnection } from './components/BrowserConnectionNew';
+import { TickerAutocomplete } from './components/TickerAutocomplete';
 import { Order } from './types';
 import { CONFIG, setApiCredentials, hasApiCredentials } from './config';
 
@@ -21,7 +22,7 @@ interface UserProfile {
 }
 
 function App() {
-  const [symbol, setSymbol] = useState<string>(CONFIG.defaultSymbol);
+  const [symbol, setSymbol] = useState<string>('BTC_USDT');
   const [currentProfile, setCurrentProfile] = useState<UserProfile | null>(null);
   const [isApiConfigured, setIsApiConfigured] = useState<boolean>(hasApiCredentials());
   const [browserConnected, setBrowserConnected] = useState<boolean>(false);
@@ -172,12 +173,11 @@ function App() {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <label className="text-sm text-gray-300">Тикер:</label>
-                <input
-                  type="text"
+                <TickerAutocomplete
                   value={symbol}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSymbol(e.target.value.toUpperCase())}
-                  placeholder="Введите тикер (например: BTCUSDT)"
-                  className="bg-gray-800 text-white px-3 py-1 rounded border border-gray-600 w-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={setSymbol}
+                  placeholder="Введите тикер (например: BTC_USDT)"
+                  className="w-48"
                 />
               </div>
               <div className="flex items-center space-x-2">
@@ -187,14 +187,15 @@ function App() {
                   className="bg-gray-800 text-white px-3 py-1 rounded border border-gray-600"
                 >
                   <option value="">Выберите тикер</option>
-                  <option value="BTCUSDT">BTC/USDT</option>
-                  <option value="ETHUSDT">ETH/USDT</option>
-                  <option value="ADAUSDT">ADA/USDT</option>
-                  <option value="SOLUSDT">SOL/USDT</option>
-                  <option value="DOTUSDT">DOT/USDT</option>
-                  <option value="MATICUSDT">MATIC/USDT</option>
-                  <option value="AVAXUSDT">AVAX/USDT</option>
-                  <option value="LINKUSDT">LINK/USDT</option>
+                  <option value="BTC_USDT">BTC/USDT</option>
+                  <option value="ETH_USDT">ETH/USDT</option>
+                  <option value="ADA_USDT">ADA/USDT</option>
+                  <option value="SOL_USDT">SOL/USDT</option>
+                  <option value="DOT_USDT">DOT/USDT</option>
+                  <option value="MATIC_USDT">MATIC/USDT</option>
+                  <option value="AVAX_USDT">AVAX/USDT</option>
+                  <option value="LINK_USDT">LINK/USDT</option>
+                  <option value="DEGENFI_USDT">DEGENFI/USDT</option>
                 </select>
               </div>
               <div

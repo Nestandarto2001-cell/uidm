@@ -13,7 +13,7 @@ const rawConfig = {
   mexcWsUrl: "wss://wbs.mexc.com/ws",
   
   // Trading Configuration
-  defaultSymbol: "BTCUSDT",
+  defaultSymbol: "BTC_USDT",
   defaultOrderType: "LIMIT",
   defaultSide: "BUY",
   
