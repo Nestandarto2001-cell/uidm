@@ -158,15 +158,15 @@ function App() {
                 <input
                   type="text"
                   value={symbol}
-                  onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSymbol(e.target.value.toUpperCase())}
                   placeholder="Введите тикер (например: BTCUSDT)"
                   className="bg-gray-800 text-white px-3 py-1 rounded border border-gray-600 w-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div className="flex items-center space-x-2">
                 <label className="text-sm text-gray-300">Быстрый выбор:</label>
-                <select 
-                  onChange={(e) => handleSymbolChange(e.target.value)}
+                <select
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleSymbolChange(e.target.value)}
                   className="bg-gray-800 text-white px-3 py-1 rounded border border-gray-600"
                 >
                   <option value="">Выберите тикер</option>
@@ -180,9 +180,11 @@ function App() {
                   <option value="LINKUSDT">LINK/USDT</option>
                 </select>
               </div>
-              <div className={`px-3 py-1 rounded text-sm ${
-                isApiConfigured ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
-              }`}>
+              <div
+                className={`px-3 py-1 rounded text-sm ${
+                  isApiConfigured ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+                }`}
+              >
                 {isApiConfigured ? 'API Connected' : 'API Not Configured'}
               </div>
             </div>
@@ -195,7 +197,7 @@ function App() {
         </div>
 
         {/* Browser Connection */}
-        <BrowserConnection 
+        <BrowserConnection
           onConnectionStatus={handleBrowserConnection}
           onOrderBookData={handleBrowserOrderBook}
         />
@@ -204,7 +206,7 @@ function App() {
         {!isApiConfigured && (
           <div className="mb-6">
             <form
-              onSubmit={(e) => {
+              onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
                 e.preventDefault();
                 const form = e.target as typeof e.target & {
                   apiKey: { value: string };
@@ -216,7 +218,9 @@ function App() {
             >
               <h2 className="text-lg font-semibold text-white mb-2">API Settings</h2>
               <div className="mb-2">
-                <label className="block text-gray-300 mb-1" htmlFor="apiKey">API Key</label>
+                <label className="block text-gray-300 mb-1" htmlFor="apiKey">
+                  API Key
+                </label>
                 <input
                   id="apiKey"
                   name="apiKey"
@@ -226,7 +230,9 @@ function App() {
                 />
               </div>
               <div className="mb-4">
-                <label className="block text-gray-300 mb-1" htmlFor="apiSecret">API Secret</label>
+                <label className="block text-gray-300 mb-1" htmlFor="apiSecret">
+                  API Secret
+                </label>
                 <input
                   id="apiSecret"
                   name="apiSecret"
@@ -246,8 +252,8 @@ function App() {
         )}
 
         {/* Market Summary */}
-        <MarketSummary 
-          summary={marketSummary} 
+        <MarketSummary
+          summary={marketSummary}
           isConnected={browserConnected || isConnected}
           symbol={symbol}
           browserConnected={browserConnected}
@@ -278,21 +284,24 @@ function App() {
 
         {/* My Orders */}
         <div className="mt-6">
-          <MyOrders
-            orders={orders}
-            onCancelOrder={handleCancelOrder}
-          />
+          <MyOrders orders={orders} onCancelOrder={handleCancelOrder} />
         </div>
 
         {/* Connection Status */}
         <div className="mt-6 text-center">
-          <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm ${
-            isConnected ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-          }`}>
-            <div className={`w-2 h-2 rounded-full mr-2 ${
-              isConnected ? 'bg-white' : 'bg-white animate-pulse'
-            }`} />
-            {isConnected ? `Connected to ${symbol} WebSocket` : 'Disconnected from WebSocket'}
+          <div
+            className={`inline-flex items-center px-3 py-1 rounded-full text-sm ${
+              isConnected ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+            }`}
+          >
+            <div
+              className={`w-2 h-2 rounded-full mr-2 ${
+                isConnected ? 'bg-white' : 'bg-white animate-pulse'
+              }`}
+            />
+            {isConnected
+              ? `Connected to ${symbol} WebSocket`
+              : 'Disconnected from WebSocket'}
           </div>
         </div>
       </div>

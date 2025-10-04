@@ -1,5 +1,32 @@
 import React, { useState, useEffect } from 'react';
 
+// Компонент для иконки вопроса с подсказкой
+const HelpIcon: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => {
+  const [showTooltip, setShowTooltip] = useState(false);
+
+  return (
+    <div className="relative inline-block">
+      <button
+        className="ml-1 text-blue-400 hover:text-blue-300 cursor-help"
+        onMouseEnter={() => setShowTooltip(true)}
+        onMouseLeave={() => setShowTooltip(false)}
+        onClick={() => setShowTooltip(!showTooltip)}
+      >
+        ❓
+      </button>
+      {showTooltip && (
+        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-80 p-3 bg-gray-900 border border-gray-600 rounded-lg shadow-lg z-50">
+          <div className="text-sm text-white">
+            <div className="font-semibold text-blue-400 mb-1">{title}</div>
+            {children}
+          </div>
+          <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 interface BrowserConnectionProps {
   onConnectionStatus: (connected: boolean) => void;
   onOrderBookData: (data: any) => void;
@@ -11,7 +38,7 @@ export const BrowserConnection: React.FC<BrowserConnectionProps> = ({
 }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [connectionMethod, setConnectionMethod] = useState<'extension' | 'injection'>('extension');
-  const [mexcUrl, setMexcUrl] = useState('https://www.mexc.com/ru-RU/exchange/');
+  const [mexcUrl, setMexcUrl] = useState('https://www.mexc.com/ru-RU/exchange/BTCUSDT');
 
   // Проверка подключения к браузеру
   useEffect(() => {
@@ -62,7 +89,10 @@ export const BrowserConnection: React.FC<BrowserConnectionProps> = ({
   }, [onOrderBookData]);
 
   const openMexcInNewTab = () => {
-    const url = `${mexcUrl}${document.querySelector('input[placeholder*="тикер"]')?.value || 'BTCUSDT'}`;
+    // Получаем текущий тикер из поля ввода
+    const tickerInput = document.querySelector('input[placeholder*="тикер"]') as HTMLInputElement;
+    const currentTicker = tickerInput?.value || 'BTCUSDT';
+    const url = `https://www.mexc.com/ru-RU/exchange/${currentTicker}`;
     window.open(url, '_blank');
   };
 
@@ -138,13 +168,19 @@ export const BrowserConnection: React.FC<BrowserConnectionProps> = ({
     <div className="bg-gray-800 rounded-lg p-6 mb-6 border border-gray-700">
       <h2 className="text-xl font-bold text-white mb-4">Подключение к MEXC</h2>
       
-      <div className="space-y-4">
+      <div className="space-y-6">
         {/* Выбор метода подключения */}
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
+          <label className="block text-sm font-medium text-gray-300 mb-3">
             Метод подключения:
+            <HelpIcon title="Выберите способ подключения">
+              <div className="space-y-2">
+                <div><strong>Расширение браузера:</strong> Автоматически извлекает данные ордербука со страницы MEXC</div>
+                <div><strong>Инжекция скриптов:</strong> Альтернативный метод через iframe (может быть заблокирован)</div>
+              </div>
+            </HelpIcon>
           </label>
-          <div className="flex space-x-4">
+          <div className="flex space-x-6">
             <label className="flex items-center">
               <input
                 type="radio"
@@ -176,50 +212,157 @@ export const BrowserConnection: React.FC<BrowserConnectionProps> = ({
           </span>
         </div>
 
-        {/* Действия */}
-        <div className="flex space-x-4">
+        {/* Пошаговые инструкции */}
+        <div className="bg-gray-700 rounded-lg p-4">
+          <h3 className="text-lg font-semibold text-white mb-3">
+            Пошаговая инструкция:
+            <HelpIcon title="Подробное руководство">
+              <div className="space-y-2">
+                <div>Следуйте этим шагам для успешного подключения к MEXC и получения данных ордербука</div>
+              </div>
+            </HelpIcon>
+          </h3>
+          
           {connectionMethod === 'extension' ? (
-            <>
-              <button
-                onClick={() => window.open('https://chrome.google.com/webstore', '_blank')}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
-              >
-                Установить расширение
-              </button>
-              <button
-                onClick={openMexcInNewTab}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors"
-              >
-                Открыть MEXC в новой вкладке
-              </button>
-            </>
+            <div className="space-y-3">
+              <div className="flex items-start space-x-3">
+                <div className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">1</div>
+                <div className="text-white">
+                  <strong>Установите расширение:</strong> Загрузите расширение из папки проекта в Chrome
+                  <button
+                    onClick={() => window.open('chrome://extensions/', '_blank')}
+                    className="ml-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm transition-colors"
+                  >
+                    Открыть расширения
+                    <HelpIcon title="Установка расширения">
+                      <div className="space-y-2">
+                        <div>1. Включите "Режим разработчика"</div>
+                        <div>2. Нажмите "Загрузить распакованное расширение"</div>
+                        <div>3. Выберите папку "browser-extension" из проекта</div>
+                        <div>4. Убедитесь, что расширение включено</div>
+                      </div>
+                    </HelpIcon>
+                  </button>
+                </div>
+              </div>
+              
+              <div className="flex items-start space-x-3">
+                <div className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">2</div>
+                <div className="text-white">
+                  <strong>Откройте MEXC:</strong> Перейдите на сайт MEXC и войдите в аккаунт
+                  <button
+                    onClick={openMexcInNewTab}
+                    className="ml-2 px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition-colors"
+                  >
+                    Открыть MEXC
+                    <HelpIcon title="Открытие MEXC">
+                      <div className="space-y-2">
+                        <div>1. Откроется новая вкладка с MEXC</div>
+                        <div>2. Войдите в свой аккаунт</div>
+                        <div>3. Убедитесь, что вы на странице с ордербуком</div>
+                        <div>4. Проверьте, что ордербук отображается</div>
+                      </div>
+                    </HelpIcon>
+                  </button>
+                </div>
+              </div>
+              
+              <div className="flex items-start space-x-3">
+                <div className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">3</div>
+                <div className="text-white">
+                  <strong>Перейдите на нужный тикер:</strong> Введите тикер в поле выше и обновите страницу MEXC
+                  <HelpIcon title="Выбор тикера">
+                    <div className="space-y-2">
+                      <div>1. Введите нужный тикер в поле "Тикер" выше</div>
+                      <div>2. Нажмите кнопку "Открыть MEXC" еще раз</div>
+                      <div>3. Убедитесь, что вы на правильной странице</div>
+                      <div>4. Ордербук должен отображаться на странице</div>
+                    </div>
+                  </HelpIcon>
+                </div>
+              </div>
+              
+              <div className="flex items-start space-x-3">
+                <div className="w-6 h-6 bg-green-600 text-white rounded-full flex items-center justify-center text-sm font-bold">✓</div>
+                <div className="text-white">
+                  <strong>Готово!</strong> Данные ордербука автоматически передаются в терминал
+                  <HelpIcon title="Проверка подключения">
+                    <div className="space-y-2">
+                      <div>• Статус "Подключен к MEXC" должен стать зеленым</div>
+                      <div>• Ордербук в терминале должен обновляться</div>
+                      <div>• Данные поступают каждую секунду</div>
+                      <div>• Работает с любыми тикерами, включая оценочную зону</div>
+                    </div>
+                  </HelpIcon>
+                </div>
+              </div>
+            </div>
           ) : (
-            <>
-              <button
-                onClick={openMexcInNewTab}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
-              >
-                Открыть MEXC в новой вкладке
-              </button>
-              <button
-                onClick={injectScript}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors"
-              >
-                Подключиться через iframe
-              </button>
-            </>
+            <div className="space-y-3">
+              <div className="flex items-start space-x-3">
+                <div className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">1</div>
+                <div className="text-white">
+                  <strong>Откройте MEXC:</strong> Перейдите на сайт MEXC и войдите в аккаунт
+                  <button
+                    onClick={openMexcInNewTab}
+                    className="ml-2 px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition-colors"
+                  >
+                    Открыть MEXC
+                    <HelpIcon title="Открытие MEXC">
+                      <div className="space-y-2">
+                        <div>1. Откроется новая вкладка с MEXC</div>
+                        <div>2. Войдите в свой аккаунт</div>
+                        <div>3. Перейдите на нужный тикер</div>
+                        <div>4. Убедитесь, что ордербук отображается</div>
+                      </div>
+                    </HelpIcon>
+                  </button>
+                </div>
+              </div>
+              
+              <div className="flex items-start space-x-3">
+                <div className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">2</div>
+                <div className="text-white">
+                  <strong>Подключитесь через iframe:</strong> Внедрите скрипт для извлечения данных
+                  <button
+                    onClick={injectScript}
+                    className="ml-2 px-3 py-1 bg-orange-600 hover:bg-orange-700 text-white rounded text-sm transition-colors"
+                  >
+                    Подключиться
+                    <HelpIcon title="Подключение через iframe">
+                      <div className="space-y-2">
+                        <div>⚠️ Этот метод может не работать из-за CORS политик</div>
+                        <div>1. Нажмите кнопку "Подключиться"</div>
+                        <div>2. Если не работает, используйте расширение</div>
+                        <div>3. Проверьте консоль браузера на ошибки</div>
+                      </div>
+                    </HelpIcon>
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
         </div>
 
-        {/* Инструкции */}
-        <div className="mt-4 p-4 bg-blue-900/20 border border-blue-600/30 rounded-md">
-          <h3 className="text-sm font-medium text-blue-400 mb-2">Инструкции:</h3>
-          <ul className="text-sm text-blue-300 space-y-1">
-            <li>• Откройте MEXC в браузере и войдите в аккаунт</li>
-            <li>• Перейдите на страницу нужного тикера</li>
-            <li>• Убедитесь, что ордербук отображается</li>
-            <li>• Нажмите кнопку подключения выше</li>
-            <li>• Данные будут автоматически передаваться в терминал</li>
+        {/* Устранение неполадок */}
+        <div className="bg-yellow-900/20 border border-yellow-600/30 rounded-md p-4">
+          <h3 className="text-sm font-medium text-yellow-400 mb-2">
+            Устранение неполадок:
+            <HelpIcon title="Решение проблем">
+              <div className="space-y-2">
+                <div><strong>Не работает подключение:</strong></div>
+                <div>• Обновите страницу MEXC</div>
+                <div>• Проверьте, что расширение включено</div>
+                <div>• Убедитесь, что ордербук отображается</div>
+                <div>• Попробуйте другой тикер</div>
+              </div>
+            </HelpIcon>
+          </h3>
+          <ul className="text-sm text-yellow-300 space-y-1">
+            <li>• Если статус "Не подключен", проверьте расширение</li>
+            <li>• Убедитесь, что вы на странице с ордербуком</li>
+            <li>• Попробуйте обновить страницу MEXC</li>
+            <li>• Проверьте консоль браузера (F12) на ошибки</li>
           </ul>
         </div>
 
