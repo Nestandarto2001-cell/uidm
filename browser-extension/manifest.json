@@ -1,27 +1,44 @@
 {
   "manifest_version": 3,
-  "name": "MEXC Trading Terminal Connector",
-  "version": "1.0.0",
+  "name": "MEXC Terminal Bridge",
+  "version": "0.1.0",
   "description": "Подключает терминал к MEXC для получения данных ордербука из оценочной зоны",
   "permissions": [
-    "activeTab",
-    "scripting",
-    "storage"
+    "storage",
+    "alarms",
+    "scripting"
   ],
   "host_permissions": [
     "https://www.mexc.com/*",
-    "https://mexc.com/*"
-  ],
-  "content_scripts": [
-    {
-      "matches": ["https://www.mexc.com/*", "https://mexc.com/*"],
-      "js": ["content.js"],
-      "run_at": "document_end"
-    }
+    "https://www.mexc.*/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+      ],
+      "js": ["terminal-bridge.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    },
+    {
+      "name": "mexc-content",
+      "matches": [
+        "https://www.mexc.com/*",
+        "https://mexc.com/*"
+      ],
+      "js": ["content_mexc.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
   "action": {
     "default_popup": "popup.html",
     "default_title": "MEXC Terminal Connector"
@@ -29,7 +46,10 @@
   "web_accessible_resources": [
     {
       "resources": ["injected.js"],
-      "matches": ["https://www.mexc.com/*", "https://mexc.com/*"]
+      "matches": [
+        "https://www.mexc.com/*",
+        "https://mexc.com/*"
+      ]
     }
   ]
 }

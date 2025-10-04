@@ -1,4 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { TooltipButton } from './Tooltip';
+import { TopActions } from './TopActions';
+import { CollapsiblePanel } from './CollapsiblePanel';
+import { ExtensionPanel } from './ExtensionPanel';
 
 interface BrowserConnectionProps {
   onConnectionStatus: (connected: boolean) => void;
@@ -16,6 +20,45 @@ export const BrowserConnection: React.FC<BrowserConnectionProps> = ({
   const [showInstructions, setShowInstructions] = useState(false);
   const [showTroubleshooting, setShowTroubleshooting] = useState(false);
   const [showConnectionMethod, setShowConnectionMethod] = useState(false);
+  
+  // Состояния для операций
+  const [isDiagnosticRunning, setIsDiagnosticRunning] = useState(false);
+  const [isTestDataRunning, setIsTestDataRunning] = useState(false);
+  const [diagnosticResult, setDiagnosticResult] = useState<string>('');
+  const [isExtensionPanelOpen, setIsExtensionPanelOpen] = useState(false);
+  const [testDataResult, setTestDataResult] = useState<string>('');
+  const [notification, setNotification] = useState<{type: 'success' | 'error' | 'info', message: string} | null>(null);
+  
+  // Ссылки для прерывания операций
+  const diagnosticAbortController = React.useRef<AbortController | null>(null);
+  const testDataAbortController = React.useRef<AbortController | null>(null);
+
+  // Функция для показа уведомлений
+  const showNotification = (type: 'success' | 'error' | 'info', message: string) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 5000);
+  };
+
+  // Функции для прерывания операций
+  const cancelDiagnostic = () => {
+    if (diagnosticAbortController.current) {
+      diagnosticAbortController.current.abort();
+      diagnosticAbortController.current = null;
+      setIsDiagnosticRunning(false);
+      setDiagnosticResult('Диагностика прервана пользователем');
+      showNotification('info', 'Диагностика прервана');
+    }
+  };
+
+  const cancelTestData = () => {
+    if (testDataAbortController.current) {
+      testDataAbortController.current.abort();
+      testDataAbortController.current = null;
+      setIsTestDataRunning(false);
+      setTestDataResult('Тест данных прерван пользователем');
+      showNotification('info', 'Тест данных прерван');
+    }
+  };
 
   // Функция для сворачивания других меню
   const toggleMenu = (menuType: 'instructions' | 'troubleshooting' | 'connectionMethod') => {
@@ -69,19 +112,29 @@ export const BrowserConnection: React.FC<BrowserConnectionProps> = ({
         console.log('Получены данные от расширения:', event.data.payload);
         const data = event.data.payload;
         if (data.bids && data.asks) {
-          setIsConnected(true);
-          onConnectionStatus(true);
-          onOrderBookData(data);
-          // Сохраняем в localStorage
-          localStorage.setItem('mexc_orderbook_data', JSON.stringify(data));
+          // Проверяем, не тестовые ли это данные
+          if (data.url === 'test') {
+            console.log('Получены тестовые данные - НЕ устанавливаем статус подключения');
+            onOrderBookData(data);
+            // НЕ сохраняем тестовые данные в localStorage
+            // НЕ устанавливаем статус подключения
+          } else {
+            // Реальные данные от MEXC
+            console.log('Получены реальные данные от MEXC - устанавливаем статус подключения');
+            setIsConnected(true);
+            onConnectionStatus(true);
+            onOrderBookData(data);
+            // Сохраняем в localStorage
+            localStorage.setItem('mexc_orderbook_data', JSON.stringify(data));
+          }
         }
       }
     };
 
     window.addEventListener('message', handleMessage);
 
-    // Проверяем каждую секунду
-    const interval = setInterval(checkConnection, 1000);
+    // Проверяем с частотой 60 FPS
+    const interval = setInterval(checkConnection, 16);
     checkConnection(); // Первоначальная проверка
 
     return () => {
@@ -134,33 +187,31 @@ export const BrowserConnection: React.FC<BrowserConnectionProps> = ({
   };
 
   return (
-    <div className="bg-gray-800 rounded-lg p-4 mb-4 border border-gray-700">
+    <div className="bg-slate-800/60 border border-slate-600/50 p-4 mb-4">
       {/* Заголовок и статус */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-3">
-          <h2 className="text-lg font-semibold text-white">Подключение к MEXC</h2>
-          <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-          <span className="text-white text-sm">
-            {isConnected ? 'Подключен' : 'Не подключен'}
-          </span>
+          <h2 className="text-lg font-semibold text-slate-200">Действия</h2>
         </div>
         
         <div className="flex space-x-2">
           <button
             onClick={() => showConnectionMethod ? setShowConnectionMethod(false) : toggleMenu('connectionMethod')}
-            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm transition-colors"
+            className="px-3 py-1 border border-slate-600/50 hover:bg-slate-700/50 text-slate-200 text-xs transition-colors"
           >
-            {showConnectionMethod ? 'Скрыть' : 'Методы'} ▼
+            {showConnectionMethod ? 'Скрыть' : 'Способы подключения'} ▼
           </button>
+          
           <button
             onClick={() => showInstructions ? setShowInstructions(false) : toggleMenu('instructions')}
-            className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition-colors"
+            className="px-3 py-1 border border-slate-600/50 hover:bg-slate-700/50 text-slate-200 text-xs transition-colors"
           >
             {showInstructions ? 'Скрыть' : 'Инструкции'} ▼
           </button>
+          
           <button
             onClick={() => showTroubleshooting ? setShowTroubleshooting(false) : toggleMenu('troubleshooting')}
-            className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-sm transition-colors"
+            className="px-3 py-1 border border-slate-600/50 hover:bg-slate-700/50 text-slate-200 text-xs transition-colors"
           >
             {showTroubleshooting ? 'Скрыть' : 'Помощь'} ▼
           </button>
@@ -169,54 +220,125 @@ export const BrowserConnection: React.FC<BrowserConnectionProps> = ({
 
       {/* Быстрые действия */}
       <div className="flex flex-wrap gap-3 mb-4">
-        <button
-          onClick={openMexcInNewTab}
-          className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded transition-colors"
-        >
-          🚀 Открыть MEXC
-        </button>
-        <button
-          onClick={() => window.open('chrome://extensions/', '_blank')}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
-        >
-          ⚙️ Расширения Chrome
-        </button>
-        <button
-          onClick={() => {
-            console.log('=== ДИАГНОСТИКА ПОДКЛЮЧЕНИЯ ===');
-            console.log('localStorage данные:', localStorage.getItem('mexc_orderbook_data'));
-            console.log('Текущий тикер:', currentTicker);
-            console.log('Статус подключения:', isConnected);
+        <TopActions
+          onOpenMexc={openMexcInNewTab}
+          onOpenExtensions={() => setIsExtensionPanelOpen(true)}
+          onDiagnostic={async () => {
+            if (isDiagnosticRunning) return;
             
-            // Очищаем старые данные для тестирования
-            localStorage.removeItem('mexc_orderbook_data');
-            setIsConnected(false);
-            onConnectionStatus(false);
-            console.log('Данные очищены, ожидаем новые...');
+            setIsDiagnosticRunning(true);
+            setDiagnosticResult('');
+            diagnosticAbortController.current = new AbortController();
+            
+            try {
+              await new Promise((resolve, reject) => {
+                const timeout = setTimeout(resolve, 1000);
+                diagnosticAbortController.current?.signal.addEventListener('abort', () => {
+                  clearTimeout(timeout);
+                  reject(new Error('Operation cancelled'));
+                });
+              });
+              
+              console.log('=== ДИАГНОСТИКА ПОДКЛЮЧЕНИЯ ===');
+              const localStorageData = localStorage.getItem('mexc_orderbook_data');
+              console.log('localStorage данные:', localStorageData);
+              console.log('Текущий тикер:', currentTicker);
+              console.log('Статус подключения:', isConnected);
+              
+              let result = `Диагностика завершена:\n`;
+              result += `• Текущий тикер: ${currentTicker}\n`;
+              result += `• Статус подключения: ${isConnected ? 'Подключен' : 'Не подключен'}\n`;
+              result += `• Данные в localStorage: ${localStorageData ? 'Есть' : 'Нет'}\n`;
+              
+              if (localStorageData) {
+                try {
+                  const data = JSON.parse(localStorageData);
+                  result += `• Количество bids: ${data.bids?.length || 0}\n`;
+                  result += `• Количество asks: ${data.asks?.length || 0}\n`;
+                  result += `• Время последнего обновления: ${new Date(data.timestamp).toLocaleString()}\n`;
+                } catch (e) {
+                  result += `• Ошибка парсинга данных: ${e}\n`;
+                }
+              }
+              
+              localStorage.removeItem('mexc_orderbook_data');
+              setIsConnected(false);
+              onConnectionStatus(false);
+              console.log('Данные очищены, ожидаем новые...');
+              
+              result += `• Старые данные очищены\n`;
+              result += `• Готов к получению новых данных`;
+              
+              setDiagnosticResult(result);
+              showNotification('success', 'Диагностика завершена успешно');
+              
+            } catch (error) {
+              if (error instanceof Error && error.message === 'Operation cancelled') {
+                return;
+              }
+              setDiagnosticResult(`Ошибка диагностики: ${error}`);
+              showNotification('error', 'Ошибка при выполнении диагностики');
+            } finally {
+              setIsDiagnosticRunning(false);
+              diagnosticAbortController.current = null;
+            }
           }}
-          className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded transition-colors"
-        >
-          🔍 Диагностика
-        </button>
-        <button
-          onClick={() => {
-            // Отправляем тестовое сообщение
-            window.postMessage({
-              type: 'MEXC_ORDERBOOK_DATA',
-              payload: {
+          onTestData={async () => {
+            if (isTestDataRunning) return;
+            
+            setIsTestDataRunning(true);
+            setTestDataResult('');
+            testDataAbortController.current = new AbortController();
+            
+            try {
+              await new Promise((resolve, reject) => {
+                const timeout = setTimeout(resolve, 800);
+                testDataAbortController.current?.signal.addEventListener('abort', () => {
+                  clearTimeout(timeout);
+                  reject(new Error('Operation cancelled'));
+                });
+              });
+              
+              const testData = {
                 bids: [[50000, 0.1], [49999, 0.2], [49998, 0.3]],
                 asks: [[50001, 0.1], [50002, 0.2], [50003, 0.3]],
                 timestamp: Date.now(),
                 url: 'test',
                 symbol: currentTicker
+              };
+              
+              window.postMessage({
+                type: 'MEXC_ORDERBOOK_DATA',
+                payload: testData
+              }, '*');
+              
+              console.log('Отправлено тестовое сообщение');
+              
+              let result = `Тест данных завершен:\n`;
+              result += `• Отправлено ${testData.bids.length} bids\n`;
+              result += `• Отправлено ${testData.asks.length} asks\n`;
+              result += `• Тикер: ${currentTicker}\n`;
+              result += `• Время: ${new Date().toLocaleString()}\n`;
+              result += `• Статус подключения НЕ изменен`;
+              
+              setTestDataResult(result);
+              showNotification('success', 'Тестовые данные отправлены');
+              
+            } catch (error) {
+              if (error instanceof Error && error.message === 'Operation cancelled') {
+                return;
               }
-            }, '*');
-            console.log('Отправлено тестовое сообщение');
+              setTestDataResult(`Ошибка теста: ${error}`);
+              showNotification('error', 'Ошибка при отправке тестовых данных');
+            } finally {
+              setIsTestDataRunning(false);
+              testDataAbortController.current = null;
+            }
           }}
-          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors"
-        >
-          🧪 Тест данных
-        </button>
+          isDiagnosticRunning={isDiagnosticRunning}
+          isTestDataRunning={isTestDataRunning}
+          currentTicker={currentTicker}
+        />
       </div>
 
       {/* Выбор метода подключения */}
@@ -378,6 +500,58 @@ export const BrowserConnection: React.FC<BrowserConnectionProps> = ({
         </div>
       )}
 
+      {/* Уведомления */}
+      {notification && (
+        <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-md transition-all duration-300 ${
+          notification.type === 'success' ? 'bg-green-600 text-white' :
+          notification.type === 'error' ? 'bg-red-600 text-white' :
+          'bg-blue-600 text-white'
+        }`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className="text-lg">
+                {notification.type === 'success' ? '✅' :
+                 notification.type === 'error' ? '❌' : 'ℹ️'}
+              </span>
+              <span className="font-medium">{notification.message}</span>
+            </div>
+            <button
+              onClick={() => setNotification(null)}
+              className="ml-4 text-white hover:text-gray-200"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Результаты операций - сворачиваемая панель */}
+      {(diagnosticResult || testDataResult) && (
+        <CollapsiblePanel
+          title="Результаты операций"
+          storageKey="diagnosticsCollapsed"
+          status={diagnosticResult ? 'success' : testDataResult ? 'info' : undefined}
+        >
+          {diagnosticResult && (
+            <div className="mb-4">
+              <h4 className="text-yellow-400 font-medium mb-2 text-sm">🔍 Диагностика:</h4>
+              <div className="bg-gray-800 rounded p-3">
+                <pre className="text-xs text-gray-300 whitespace-pre-wrap">{diagnosticResult}</pre>
+              </div>
+            </div>
+          )}
+          
+          {testDataResult && (
+            <div>
+              <h4 className="text-purple-400 font-medium mb-2 text-sm">🧪 Тест данных:</h4>
+              <div className="bg-gray-800 rounded p-3">
+                <pre className="text-xs text-gray-300 whitespace-pre-wrap">{testDataResult}</pre>
+              </div>
+            </div>
+          )}
+        </CollapsiblePanel>
+      )}
+
       {/* Скрытый iframe для инжекции */}
       {connectionMethod === 'injection' && (
         <iframe
@@ -387,6 +561,12 @@ export const BrowserConnection: React.FC<BrowserConnectionProps> = ({
           sandbox="allow-scripts allow-same-origin"
         />
       )}
+      
+      {/* Extension Panel Modal */}
+      <ExtensionPanel
+        isOpen={isExtensionPanelOpen}
+        onClose={() => setIsExtensionPanelOpen(false)}
+      />
     </div>
   );
 };
