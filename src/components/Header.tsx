@@ -21,10 +21,10 @@ export const Header: React.FC = () => {
 
   return (
     <>
-      <header className="bg-slate-800/60 border-b border-slate-600/50 px-6 py-4">
+      <header className="bg-black border-b border-gray-800 px-6 py-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold text-slate-200">
-            MEXC Trading Terminal
+          <h1 className="text-2xl font-semibold text-white tracking-tight">
+            МексоЁБ
           </h1>
           
           <div className="flex items-center space-x-4">
@@ -37,7 +37,7 @@ export const Header: React.FC = () => {
             
             <button
               onClick={() => setIsDiagnosticOpen(true)}
-              className="flex items-center space-x-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
+              className="flex items-center space-x-2 px-4 py-2 bg-white hover:bg-gray-100 text-black rounded-md transition-colors text-sm font-medium"
               title="Диагностика подключения"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

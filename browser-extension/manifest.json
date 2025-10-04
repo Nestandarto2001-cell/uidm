@@ -1,11 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "MEXC Trading Helper",
-  "version": "0.4.0",
-  "description": "Профессиональный торговый терминал для MEXC с мониторингом Assessment Zone",
+  "name": "МексоЁБ",
+  "version": "1.0.0",
+  "description": "Элитный торговый терминал для MEXC",
   "action": {
     "default_popup": "popup.html",
-    "default_title": "MEXC Trading Helper"
+    "default_title": "МексоЁБ"
   },
   "permissions": [
     "storage",

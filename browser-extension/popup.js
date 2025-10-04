@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           }
         };
 
-        const ports = [5173, 3000, 8080, 4173];
+        const ports = [3009, 5173, 3000, 8080, 4173, 3001, 3002, 3003, 3004, 3005, 3006, 3007, 3008];
         let serverRunning = false;
         let workingPort = null;
 
@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           }
         };
 
-        const ports = [5173, 3000, 8080, 4173];
+        const ports = [3009, 5173, 3000, 8080, 4173, 3001, 3002, 3003, 3004, 3005, 3006, 3007, 3008];
         let workingPort = null;
 
         for (const port of ports) {
@@ -151,8 +151,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       };
 
-      // Проверяем разные порты
-      const ports = [5173, 3000, 8080, 4173];
+      // Проверяем разные порты (включая 3009 где запустился сервер)
+      const ports = [3009, 5173, 3000, 8080, 4173, 3001, 3002, 3003, 3004, 3005, 3006, 3007, 3008];
       let workingPort = null;
 
       for (const port of ports) {
@@ -198,65 +198,72 @@ document.addEventListener('DOMContentLoaded', async () => {
         <head>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>MEXC Terminal - Auto Start</title>
+          <title>МексоЁБ - Автозапуск</title>
           <style>
             body {
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              background: #0f172a;
-              color: #e2e8f0;
+              font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+              background: #000000;
+              color: #ffffff;
               margin: 0;
-              padding: 20px;
+              padding: 40px 20px;
               display: flex;
               flex-direction: column;
               align-items: center;
               justify-content: center;
               min-height: 100vh;
               text-align: center;
+              font-weight: 400;
+              letter-spacing: -0.01em;
             }
             .container {
-              max-width: 600px;
-              padding: 40px;
-              background: #1e293b;
-              border: 1px solid #334155;
-              border-radius: 12px;
-              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+              max-width: 480px;
+              padding: 48px;
+              background: #0a0a0a;
+              border: 1px solid #1a1a1a;
+              border-radius: 16px;
             }
             .logo {
-              font-size: 2rem;
-              color: #00aaff;
-              margin-bottom: 20px;
+              font-size: 24px;
+              font-weight: 600;
+              color: #ffffff;
+              margin-bottom: 32px;
+              letter-spacing: -0.02em;
             }
             .status {
-              padding: 16px;
-              background: #065f46;
-              border: 1px solid #10b981;
-              border-radius: 8px;
-              margin: 20px 0;
-              color: #d1fae5;
+              padding: 20px;
+              background: #0a0a0a;
+              border: 1px solid #1a1a1a;
+              border-radius: 12px;
+              margin: 24px 0;
+              color: #ffffff;
+              font-weight: 500;
             }
             .command {
-              background: #1f2937;
-              border: 1px solid #374151;
-              border-radius: 6px;
-              padding: 16px;
-              font-family: 'Courier New', monospace;
-              font-size: 14px;
-              color: #fbbf24;
-              margin: 16px 0;
+              background: #0a0a0a;
+              border: 1px solid #1a1a1a;
+              border-radius: 8px;
+              padding: 20px;
+              font-family: 'SF Mono', 'Monaco', monospace;
+              font-size: 13px;
+              color: #ffffff;
+              margin: 20px 0;
               word-break: break-all;
+              font-weight: 500;
             }
             .copy-btn {
-              background: #3b82f6;
-              color: white;
+              background: #ffffff;
+              color: #000000;
               border: none;
-              padding: 8px 16px;
-              border-radius: 4px;
+              padding: 12px 24px;
+              border-radius: 8px;
               cursor: pointer;
-              font-size: 14px;
-              margin-left: 8px;
+              font-size: 13px;
+              font-weight: 600;
+              margin-left: 12px;
+              transition: all 0.15s ease;
             }
             .copy-btn:hover {
-              background: #2563eb;
+              background: #f0f0f0;
             }
             .instructions {
               text-align: left;
@@ -284,7 +291,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         </head>
         <body>
           <div class="container">
-            <div class="logo">🚀 MEXC Trading Terminal</div>
+            <div class="logo">МексоЁБ</div>
             
             <div class="status">
               <strong>Автоматический запуск сервера</strong><br>
@@ -302,7 +309,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <li>Скопируйте команду выше</li>
                 <li>Откройте терминал (PowerShell/CMD)</li>
                 <li>Вставьте и выполните команду</li>
-                <li>Дождитесь сообщения "Local: http://localhost:5173"</li>
+                <li>Дождитесь сообщения "Local: http://localhost:XXXX" (любой порт)</li>
                 <li>Страница автоматически перенаправится на терминал</li>
               </ol>
             </div>
@@ -326,18 +333,30 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             
             function checkServer() {
-              fetch('http://localhost:5173', { method: 'HEAD', mode: 'no-cors' })
-                .then(() => {
-                  document.getElementById('redirectStatus').textContent = 'Сервер запущен! Перенаправление...';
+              // Проверяем разные порты
+              const ports = [3009, 5173, 3000, 8080, 4173, 3001, 3002, 3003, 3004, 3005, 3006, 3007, 3008];
+              
+              const checkPort = async (port) => {
+                try {
+                  await fetch(\`http://localhost:\${port}\`, { method: 'HEAD', mode: 'no-cors' });
+                  return port;
+                } catch (error) {
+                  return null;
+                }
+              };
+              
+              // Проверяем все порты параллельно
+              Promise.all(ports.map(checkPort)).then(results => {
+                const workingPort = results.find(port => port !== null);
+                if (workingPort) {
+                  document.getElementById('redirectStatus').textContent = \`Сервер запущен на порту \${workingPort}! Перенаправление...\`;
                   clearInterval(checkInterval);
                   clearTimeout(redirectTimer);
                   setTimeout(() => {
-                    window.location.href = 'http://localhost:5173';
+                    window.location.href = \`http://localhost:\${workingPort}\`;
                   }, 1000);
-                })
-                .catch(() => {
-                  // Сервер еще не запущен
-                });
+                }
+              });
             }
             
             function updateCountdown() {
@@ -407,62 +426,69 @@ document.addEventListener('DOMContentLoaded', async () => {
         <head>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>MEXC Terminal - Start Command</title>
+          <title>МексоЁБ - Команда</title>
           <style>
             body {
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              background: #0f172a;
-              color: #e2e8f0;
+              font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+              background: #000000;
+              color: #ffffff;
               margin: 0;
-              padding: 20px;
+              padding: 40px 20px;
               display: flex;
               flex-direction: column;
               align-items: center;
               justify-content: center;
               min-height: 100vh;
               text-align: center;
+              font-weight: 400;
+              letter-spacing: -0.01em;
             }
             .container {
-              max-width: 500px;
-              padding: 30px;
-              background: #1e293b;
-              border: 1px solid #334155;
-              border-radius: 12px;
+              max-width: 400px;
+              padding: 40px;
+              background: #0a0a0a;
+              border: 1px solid #1a1a1a;
+              border-radius: 16px;
             }
             .logo {
-              font-size: 1.5rem;
-              color: #00aaff;
-              margin-bottom: 20px;
+              font-size: 20px;
+              font-weight: 600;
+              color: #ffffff;
+              margin-bottom: 24px;
+              letter-spacing: -0.02em;
             }
             .command {
-              background: #1f2937;
-              border: 1px solid #374151;
-              border-radius: 6px;
-              padding: 16px;
-              font-family: 'Courier New', monospace;
-              font-size: 14px;
-              color: #fbbf24;
-              margin: 16px 0;
+              background: #0a0a0a;
+              border: 1px solid #1a1a1a;
+              border-radius: 8px;
+              padding: 20px;
+              font-family: 'SF Mono', 'Monaco', monospace;
+              font-size: 13px;
+              color: #ffffff;
+              margin: 20px 0;
               word-break: break-all;
               cursor: pointer;
               user-select: all;
+              font-weight: 500;
             }
             .command:hover {
-              background: #374151;
+              background: #1a1a1a;
             }
             .copy-btn {
-              background: #3b82f6;
-              color: white;
+              background: #ffffff;
+              color: #000000;
               border: none;
-              padding: 10px 20px;
-              border-radius: 6px;
+              padding: 14px 24px;
+              border-radius: 8px;
               cursor: pointer;
-              font-size: 14px;
-              margin: 10px 0;
+              font-size: 13px;
+              font-weight: 600;
+              margin: 16px 0;
               width: 100%;
+              transition: all 0.15s ease;
             }
             .copy-btn:hover {
-              background: #2563eb;
+              background: #f0f0f0;
             }
             .instructions {
               text-align: left;
@@ -481,7 +507,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         </head>
         <body>
           <div class="container">
-            <div class="logo">🚀 MEXC Terminal</div>
+            <div class="logo">МексоЁБ</div>
             
             <div style="margin-bottom: 20px;">
               <strong>Команда для запуска сервера:</strong>
@@ -500,7 +526,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <li>Откройте PowerShell или CMD</li>
                 <li>Вставьте команду (Ctrl+V)</li>
                 <li>Нажмите Enter</li>
-                <li>Дождитесь "Local: http://localhost:5173"</li>
+                <li>Дождитесь "Local: http://localhost:XXXX" (любой порт)</li>
                 <li>Откройте терминал в браузере</li>
               </ol>
             </div>
