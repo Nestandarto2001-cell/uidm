@@ -27,6 +27,22 @@ window.addEventListener('message', async (e) => {
   });
 });
 
+// Обработка сообщений от popup расширения
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log('[Content Script] Received message from popup:', message);
+  
+  if (message.type === 'OPEN_DIAGNOSTIC') {
+    // Отправляем сообщение на страницу для открытия диагностики
+    window.postMessage({ 
+      source: 'MEXC_TT', 
+      type: 'OPEN_DIAGNOSTIC_MODAL',
+      fromExtension: true 
+    }, ORIGIN);
+    
+    sendResponse({ success: true });
+  }
+});
+
 // От воркера к странице (например, пуш-события)
 chrome.runtime.onMessage.addListener((msg) => {
   console.log('[Content Script] Received message from worker:', msg);
