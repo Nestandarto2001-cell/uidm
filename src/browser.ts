@@ -1,33 +1,111 @@
 import { chromium, Browser, Page } from "playwright";
-import fs from "fs/promises";
-import path from "path";
 import { CONFIG } from "./config";
 
 export class MexcBrowser {
   private browser!: Browser;
   private page!: Page;
+  private isWorking: boolean = false;
+  private retryCount: number = 0;
+  private statusCallbacks: ((status: { working: boolean, error?: string }) => void)[] = [];
 
   async start() {
+    if (!CONFIG.mexcUid) {
+      throw new Error("MEXC_UID не установлен! Установите переменную окружения MEXC_UID или добавьте в config.ts");
+    }
+
     this.browser = await chromium.launch({ headless: CONFIG.headless });
     const ctx = await this.browser.newContext();
-    // Применяем cookies
+    
+    // Устанавливаем UID cookie
+    await ctx.addCookies([{
+      name: 'u_id',
+      value: CONFIG.mexcUid,
+      domain: '.mexc.com',
+      path: '/',
+      httpOnly: true,
+      secure: true
+    }]);
+    
+    this.page = await ctx.newPage();
+    
+    // Проверяем статус авторизации
+    await this.checkAuthStatus();
+    
+    // Запускаем мониторинг статуса
+    this.startStatusMonitoring();
+  }
+
+  onStatusChange(callback: (status: { working: boolean, error?: string }) => void) {
+    this.statusCallbacks.push(callback);
+  }
+
+  private notifyStatus(working: boolean, error?: string) {
+    this.isWorking = working;
+    this.statusCallbacks.forEach(callback => callback({ working, error }));
+  }
+
+  private async checkAuthStatus(): Promise<boolean> {
     try {
-      const cookiesRaw = await fs.readFile(path.resolve(CONFIG.cookiesPath), "utf-8");
-      const state = JSON.parse(cookiesRaw);
-      if (state.cookies) {
-        await ctx.addCookies(state.cookies);
+      await this.page.goto(CONFIG.mexcBaseUrl, { waitUntil: "domcontentloaded" });
+      await this.page.waitForTimeout(2000);
+      
+      // Проверяем наличие элементов, указывающих на авторизацию
+      const isLoggedIn = await this.page.evaluate(() => {
+        // Ищем элементы, которые появляются только у авторизованных пользователей
+        return document.querySelector('[data-testid="user-menu"], .user-info, [class*="user"], [class*="profile"]') !== null ||
+               !document.querySelector('[data-testid="login"], .login-btn, [class*="login"]');
+      });
+      
+      if (isLoggedIn) {
+        this.retryCount = 0;
+        this.notifyStatus(true);
+        console.log("✅ Авторизация успешна");
+        return true;
+      } else {
+        this.notifyStatus(false, "Не авторизован - проверьте UID");
+        console.warn("⚠️ Не авторизован - проверьте UID");
+        return false;
       }
     } catch (error) {
-      console.warn("Не удалось загрузить cookies:", error);
+      this.notifyStatus(false, `Ошибка проверки авторизации: ${error}`);
+      console.error("❌ Ошибка проверки авторизации:", error);
+      return false;
     }
-    this.page = await ctx.newPage();
+  }
+
+  private startStatusMonitoring() {
+    setInterval(async () => {
+      if (this.retryCount >= CONFIG.maxRetries) {
+        this.notifyStatus(false, "Превышено максимальное количество попыток - требуется новый UID");
+        console.error("❌ Превышено максимальное количество попыток - требуется новый UID");
+        return;
+      }
+      
+      const isWorking = await this.checkAuthStatus();
+      if (!isWorking) {
+        this.retryCount++;
+        console.warn(`⚠️ Попытка ${this.retryCount}/${CONFIG.maxRetries} - авторизация не работает`);
+      }
+    }, CONFIG.statusCheckInterval);
   }
 
   async gotoSpot(symbol: string) {
+    if (!this.isWorking) {
+      throw new Error("Браузер не авторизован - проверьте UID");
+    }
+    
     const url = CONFIG.mexcBaseUrl + CONFIG.spotPath(symbol);
     await this.page.goto(url, { waitUntil: "domcontentloaded" });
     // Подождём блок стакана
     await this.page.waitForTimeout(1500);
+  }
+
+  getStatus() {
+    return {
+      working: this.isWorking,
+      retryCount: this.retryCount,
+      maxRetries: CONFIG.maxRetries
+    };
   }
 
   async readOrderBook(): Promise<{ bids: [number, number][], asks: [number, number][] }> {
@@ -71,6 +149,10 @@ export class MexcBrowser {
   }
 
   async placeLimit(side: "buy"|"sell", price: number, amount: number) {
+    if (!this.isWorking) {
+      throw new Error("Браузер не авторизован - проверьте UID");
+    }
+    
     await this.selectLimitTab();
 
     // Поиск полей цены/количества (несколько стратегий)
@@ -93,7 +175,11 @@ export class MexcBrowser {
   }
 
   async placeMarket(side: "buy"|"sell", amount: number) {
-    // Переключиться на “Рынок”
+    if (!this.isWorking) {
+      throw new Error("Браузер не авторизован - проверьте UID");
+    }
+    
+    // Переключиться на "Рынок"
     const marketBtn = await this.page.locator('button:has-text("Рынок"), [role="tab"]:has-text("Рынок")').first();
     if (await marketBtn.count()) await marketBtn.click();
 

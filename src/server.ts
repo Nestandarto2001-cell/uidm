@@ -23,9 +23,20 @@ export function startHttpServer() {
   .controls{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px;}
   input{padding:6px 8px;}
   button{padding:6px 10px; cursor:pointer;}
+  .status-indicator{padding:8px 12px; border-radius:4px; margin-bottom:12px; display:flex; align-items:center; gap:8px;}
+  .status-working{background:#d4edda; color:#155724; border:1px solid #c3e6cb;}
+  .status-error{background:#f8d7da; color:#721c24; border:1px solid #f5c6cb;}
+  .status-connecting{background:#d1ecf1; color:#0c5460; border:1px solid #bee5eb;}
+  .notification{position:fixed; top:20px; right:20px; padding:12px 16px; border-radius:4px; z-index:1000; max-width:300px;}
+  .notification-error{background:#f8d7da; color:#721c24; border:1px solid #f5c6cb;}
+  .notification-success{background:#d4edda; color:#155724; border:1px solid #c3e6cb;}
 </style>
 </head><body>
 <h2>MEXC Assessment Trader</h2>
+<div id="status" class="status-indicator">
+  <span id="statusText">Подключение...</span>
+  <span id="statusIcon">🔄</span>
+</div>
 <div class="controls">
   <input id="symbol" placeholder="SYMBOL (e.g. YNE)" />
   <button id="load">Load</button>
@@ -59,7 +70,9 @@ export function startHttpServer() {
     if(msg.type==="orderbook"){
       render(msg.payload);
     } else if (msg.type==="error"){
-      alert(msg.payload || "Error");
+      showNotification(msg.payload || "Error", "error");
+    } else if (msg.type==="browserStatus"){
+      updateStatus(msg.payload);
     }
   };
 
@@ -78,6 +91,37 @@ export function startHttpServer() {
   document.getElementById("sellL").onclick = ()=>sendOrder("limit","sell");
   document.getElementById("buyM").onclick = ()=>sendOrder("market","buy");
   document.getElementById("sellM").onclick = ()=>sendOrder("market","sell");
+
+  function updateStatus(status) {
+    const statusEl = document.getElementById("status");
+    const statusText = document.getElementById("statusText");
+    const statusIcon = document.getElementById("statusIcon");
+    
+    if (status.working) {
+      statusEl.className = "status-indicator status-working";
+      statusText.textContent = "Браузер работает";
+      statusIcon.textContent = "✅";
+    } else {
+      statusEl.className = "status-indicator status-error";
+      statusText.textContent = "Ошибка: " + (status.error || "Неизвестная ошибка");
+      statusIcon.textContent = "❌";
+      
+      if (status.error && status.error.includes("UID")) {
+        showNotification("Требуется новый UID! Проверьте настройки.", "error");
+      }
+    }
+  }
+
+  function showNotification(message, type) {
+    const notification = document.createElement("div");
+    notification.className = "notification notification-" + type;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+      notification.remove();
+    }, 5000);
+  }
 
   function render(ob){
     const asksT = document.querySelector("#asks tbody");

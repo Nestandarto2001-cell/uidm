@@ -14,6 +14,24 @@ const api = new MexcApi({
 (async () => {
   const { wss } = startHttpServer();
   const browser = new MexcBrowser();
+  
+  // Подписываемся на изменения статуса браузера
+  browser.onStatusChange((status) => {
+    const payload = JSON.stringify({ 
+      type: "browserStatus", 
+      payload: status 
+    });
+    wss.clients.forEach((c: any) => { 
+      try { c.send(payload); } catch {} 
+    });
+    
+    if (!status.working) {
+      console.error(`❌ Браузер не работает: ${status.error}`);
+    } else {
+      console.log("✅ Браузер работает нормально");
+    }
+  });
+  
   await browser.start();
 
   let symbol = "YNE"; // дефолт
