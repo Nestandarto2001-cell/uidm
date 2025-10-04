@@ -1,77 +1,38 @@
-// Простой Content script для MEXC - тестовая версия
-console.log('MEXC Simple Connector загружен');
+/**
+ * Content Script - Bridge между страницей и Service Worker
+ * Страница ↔ Контент-скрипт ↔ Воркер
+ */
 
-// Функция для создания тестовых данных ордербука
-function createTestOrderBook() {
-  const basePrice = 50000 + Math.random() * 1000; // Случайная цена около 50000
-  
-  const bids = [];
-  const asks = [];
-  
-  // Создаем 5 уровней для покупки (bids)
-  for (let i = 0; i < 5; i++) {
-    const price = basePrice - (i * 10);
-    const amount = 0.1 + Math.random() * 0.5;
-    bids.push([parseFloat(price.toFixed(2)), parseFloat(amount.toFixed(4))]);
+const ORIGIN = location.origin;
+
+console.log('[Content Script] Initialized on:', location.href);
+
+// От страницы к воркеру
+window.addEventListener('message', async (e) => {
+  const msg = e.data;
+  if (!msg || msg.source !== 'MEXC_TT') return;
+
+  console.log('[Content Script] Received message from page:', msg);
+
+  if (msg.type === 'PING') {
+    window.postMessage({ source: 'MEXC_TT', type: 'PONG' }, ORIGIN);
+    console.log('[Content Script] Sent PONG response');
+    return;
   }
-  
-  // Создаем 5 уровней для продажи (asks)
-  for (let i = 0; i < 5; i++) {
-    const price = basePrice + (i * 10);
-    const amount = 0.1 + Math.random() * 0.5;
-    asks.push([parseFloat(price.toFixed(2)), parseFloat(amount.toFixed(4))]);
-  }
-  
-  return {
-    bids: bids,
-    asks: asks,
-    timestamp: Date.now(),
-    url: window.location.href,
-    symbol: extractSymbolFromUrl()
-  };
-}
 
-// Извлечение символа из URL
-function extractSymbolFromUrl() {
-  const url = window.location.href;
-  const match = url.match(/\/exchange\/([^\/\?]+)/);
-  return match ? match[1] : 'BTC_USDT';
-}
-
-// Отправка данных в терминал
-function sendDataToTerminal() {
-  const orderBookData = createTestOrderBook();
-  
-  console.log('Отправляем тестовые данные ордербука:', orderBookData);
-  
-  // Отправляем через postMessage
-  window.postMessage({ 
-    type: 'MEXC_ORDERBOOK_DATA', 
-    payload: orderBookData 
-  }, '*');
-  
-  // Сохраняем в localStorage как резервный вариант
-  localStorage.setItem('mexc_orderbook_data', JSON.stringify(orderBookData));
-  
-  console.log(`Данные отправлены: ${orderBookData.bids.length} bids, ${orderBookData.asks.length} asks`);
-}
-
-// Слушаем сообщения от расширения
-window.addEventListener('message', (event) => {
-  if (event.data.type === 'EXTRACT_ORDERBOOK') {
-    sendDataToTerminal();
-  }
+  // Пересылаем сообщение в service worker
+  chrome.runtime.sendMessage(msg, (response) => {
+    console.log('[Content Script] Response from worker:', response);
+    window.postMessage({ source: 'MEXC_TT', id: msg.id, ...response }, ORIGIN);
+  });
 });
 
-// Периодическая отправка данных каждые 2 секунды
-const interval = setInterval(sendDataToTerminal, 2000);
-
-// Отправка при загрузке страницы
-setTimeout(sendDataToTerminal, 1000);
-
-// Очистка при выгрузке страницы
-window.addEventListener('beforeunload', () => {
-  clearInterval(interval);
+// От воркера к странице (например, пуш-события)
+chrome.runtime.onMessage.addListener((msg) => {
+  console.log('[Content Script] Received message from worker:', msg);
+  window.postMessage({ source: 'MEXC_TT', ...msg }, ORIGIN);
 });
 
-console.log('MEXC Simple Connector готов к работе - отправляет тестовые данные каждые 2 секунды');
+// Сообщаем странице, что контент-скрипт жив
+window.postMessage({ source: 'MEXC_TT', type: 'EXT_READY' }, ORIGIN);
+console.log('[Content Script] Sent EXT_READY signal');

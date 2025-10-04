@@ -1,0 +1,30 @@
+[
+  {
+    "id": 10001,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "responseHeaders": [
+        {
+          "header": "access-control-allow-origin",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "access-control-allow-headers",
+          "operation": "set",
+          "value": "*"
+        },
+        {
+          "header": "access-control-allow-methods",
+          "operation": "set",
+          "value": "GET,POST,PUT,DELETE,OPTIONS"
+        }
+      ]
+    },
+    "condition": {
+      "resourceTypes": ["xmlhttprequest", "fetch"],
+      "urlFilter": "||mexc.com^"
+    }
+  }
+]

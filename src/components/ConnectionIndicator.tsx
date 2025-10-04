@@ -1,4 +1,5 @@
 import React from 'react';
+import Tooltip from './SimpleTooltip';
 
 interface ConnectionIndicatorProps {
   extState: 'live' | 'degraded' | 'disconnected';
@@ -53,10 +54,12 @@ export const ConnectionIndicator: React.FC<ConnectionIndicatorProps> = ({
   return (
     <div className="flex items-center gap-2">
       {/* EXT Status */}
-      <div className="flex items-center gap-1 px-2 py-1 bg-slate-800/60 border border-slate-600/50 text-xs">
-        <div className={`w-2 h-2 ${getExtStatusColor()}`}></div>
-        <span className="text-slate-200">EXT: {getExtStatusText()}</span>
-      </div>
+      <Tooltip text="Работает в Chrome/Edge. Включите расширение и разрешите доступ сайту терминала.">
+        <div className="flex items-center gap-1 px-2 py-1 bg-slate-800/60 border border-slate-600/50 text-xs">
+          <div className={`w-2 h-2 ${getExtStatusColor()}`}></div>
+          <span className="text-slate-200">EXT: {getExtStatusText()}</span>
+        </div>
+      </Tooltip>
 
       {/* OrderBook Fresh Status */}
       {(isStale || !obFresh) && (
@@ -67,10 +70,12 @@ export const ConnectionIndicator: React.FC<ConnectionIndicatorProps> = ({
 
       {/* API Status */}
       {apiState && (
-        <div className="flex items-center gap-1 px-2 py-1 bg-slate-800/60 border border-slate-600/50 text-xs">
-          <div className={`w-2 h-2 ${getApiStatusColor()}`}></div>
-          <span className="text-slate-200">API: {apiState.toUpperCase()}</span>
-        </div>
+        <Tooltip text="Есть успешный ответ от MEXC API. Если 'Disconnected' — включите CORS/проверьте ключи.">
+          <div className="flex items-center gap-1 px-2 py-1 bg-slate-800/60 border border-slate-600/50 text-xs">
+            <div className={`w-2 h-2 ${getApiStatusColor()}`}></div>
+            <span className="text-slate-200">API: {apiState.toUpperCase()}</span>
+          </div>
+        </Tooltip>
       )}
     </div>
   );

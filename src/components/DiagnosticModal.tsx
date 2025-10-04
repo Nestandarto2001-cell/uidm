@@ -4,97 +4,75 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import AssessmentBridge from '../bridge';
+import { extIsReady, probe, ping } from '../extBridge';
 
 interface DiagnosticModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-interface DiagnosticInfo {
-  bridgeStatus: 'connected' | 'disconnected' | 'unknown';
-  extensionStatus: 'active' | 'inactive' | 'unknown';
-  corsStatus: 'enabled' | 'disabled' | 'unknown';
-  apiStatus: 'connected' | 'disconnected' | 'unknown';
-  lastUpdate: string | null;
-  errors: string[];
-  suggestions: string[];
+interface DiagnosticRow {
+  k: string;
+  v: string;
+  s?: 'ok' | 'err' | 'warn';
 }
 
 const DiagnosticModal: React.FC<DiagnosticModalProps> = ({ isOpen, onClose }) => {
-  const [diagnosticInfo, setDiagnosticInfo] = useState<DiagnosticInfo>({
-    bridgeStatus: 'unknown',
-    extensionStatus: 'unknown',
-    corsStatus: 'unknown',
-    apiStatus: 'unknown',
-    lastUpdate: null,
-    errors: [],
-    suggestions: []
-  });
-
+  const [rows, setRows] = useState<DiagnosticRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const runDiagnostic = async () => {
     setIsLoading(true);
-    const errors: string[] = [];
-    const suggestions: string[] = [];
+    const r: DiagnosticRow[] = [];
 
     try {
-      // Проверка Bridge
-      const bridgeAvailable = AssessmentBridge.isBridgeAvailable();
-      if (!bridgeAvailable) {
-        errors.push('Bridge не готов к работе');
-        suggestions.push('Обновите страницу терминала');
-      }
+      // Браузер
+      r.push({ k: 'Браузер', v: navigator.userAgent, s: 'ok' });
 
-      // Проверка расширения
-      try {
-        const response = await AssessmentBridge.getStatus();
-        if (response) {
-          // Расширение отвечает
-        }
-      } catch (error) {
-        errors.push('Расширение не отвечает');
-        suggestions.push('Перезагрузите расширение в chrome://extensions/');
-      }
+      // Расширение (мост)
+      const bridgeReady = extIsReady();
+      r.push({ 
+        k: 'Расширение (мост)', 
+        v: bridgeReady ? 'Обнаружено' : 'Не найдено', 
+        s: bridgeReady ? 'ok' : 'err' 
+      });
 
-      // Проверка CORS (косвенная)
-      try {
-        const testUrl = 'https://www.mexc.com/api/v3/time';
-        const response = await fetch(testUrl, { 
-          method: 'GET',
-          mode: 'cors'
+      // Ping тест
+      if (bridgeReady) {
+        const pingResult = await ping();
+        r.push({ 
+          k: 'Связь с расширением', 
+          v: pingResult ? 'Успешно' : 'Не отвечает', 
+          s: pingResult ? 'ok' : 'err' 
         });
-        if (!response.ok) {
-          errors.push('CORS блокирует запросы к MEXC');
-          suggestions.push('Установите CORS расширение (например, CORS Unblock)');
-        }
-      } catch (error) {
-        errors.push('CORS блокирует запросы к MEXC');
-        suggestions.push('Установите CORS расширение (например, CORS Unblock)');
       }
 
-      setDiagnosticInfo(prev => ({
-        ...prev,
-        bridgeStatus: bridgeAvailable ? 'connected' : 'disconnected',
-        extensionStatus: 'active', // Если дошли до этого места
-        corsStatus: 'enabled', // Если тест прошел
-        apiStatus: 'connected',
-        lastUpdate: new Date().toLocaleString('ru-RU'),
-        errors,
-        suggestions
-      }));
+      // Доступ к MEXC API
+      if (bridgeReady) {
+        const p = await probe();
+        if (p.type === 'PROBE_OK') {
+          r.push({ k: 'Доступ к MEXC API', v: 'Успешно', s: 'ok' });
+        } else {
+          r.push({ k: 'Доступ к MEXC API', v: String(p.error || 'Ошибка'), s: 'err' });
+        }
+      }
+
+      // URL страницы
+      r.push({ k: 'URL страницы', v: window.location.href, s: 'ok' });
+
+      // Время диагностики
+      r.push({ k: 'Время диагностики', v: new Date().toLocaleString('ru-RU'), s: 'ok' });
+
+      setRows(r);
 
     } catch (error) {
-      errors.push(`Ошибка диагностики: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
-      suggestions.push('Проверьте подключение к интернету');
-      
-      setDiagnosticInfo(prev => ({
-        ...prev,
-        errors,
-        suggestions,
-        lastUpdate: new Date().toLocaleString('ru-RU')
-      }));
+      console.error('[Diagnostic] Error:', error);
+      r.push({ 
+        k: 'Ошибка диагностики', 
+        v: error instanceof Error ? error.message : 'Неизвестная ошибка', 
+        s: 'err' 
+      });
+      setRows(r);
     } finally {
       setIsLoading(false);
     }
@@ -106,149 +84,48 @@ const DiagnosticModal: React.FC<DiagnosticModalProps> = ({ isOpen, onClose }) =>
     }
   }, [isOpen]);
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'connected':
-      case 'active':
-      case 'enabled':
-        return '🟢';
-      case 'disconnected':
-      case 'inactive':
-      case 'disabled':
-        return '🔴';
+  const getStatusColor = (s?: 'ok' | 'err' | 'warn') => {
+    switch (s) {
+      case 'ok':
+        return 'text-emerald-400';
+      case 'warn':
+        return 'text-amber-400';
+      case 'err':
+        return 'text-rose-400';
       default:
-        return '⚪';
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'connected':
-        return 'Подключено';
-      case 'disconnected':
-        return 'Отключено';
-      case 'active':
-        return 'Активно';
-      case 'inactive':
-        return 'Неактивно';
-      case 'enabled':
-        return 'Включено';
-      case 'disabled':
-        return 'Отключено';
-      default:
-        return 'Неизвестно';
+        return 'text-slate-400';
     }
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-slate-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-white">🔍 Диагностика системы</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors"
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60">
+      <div className="w-[720px] rounded-2xl p-6 bg-[#0f172a] border border-[#1f2a44] shadow-xl">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-semibold text-slate-100">🔍 Диагностика</h3>
+          <button 
+            onClick={onClose} 
+            className="px-3 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            Закрыть
           </button>
         </div>
-
-        {/* Статусы компонентов */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="bg-slate-700 rounded-lg p-4">
-            <div className="flex items-center space-x-2 mb-2">
-              <span className="text-lg">{getStatusIcon(diagnosticInfo.bridgeStatus)}</span>
-              <h3 className="font-semibold text-white">Bridge</h3>
-            </div>
-            <p className="text-sm text-gray-300">
-              {getStatusText(diagnosticInfo.bridgeStatus)}
-            </p>
-            <p className="text-xs text-gray-400 mt-1">
-              Коммуникация между страницей и расширением
-            </p>
-          </div>
-
-          <div className="bg-slate-700 rounded-lg p-4">
-            <div className="flex items-center space-x-2 mb-2">
-              <span className="text-lg">{getStatusIcon(diagnosticInfo.extensionStatus)}</span>
-              <h3 className="font-semibold text-white">Расширение</h3>
-            </div>
-            <p className="text-sm text-gray-300">
-              {getStatusText(diagnosticInfo.extensionStatus)}
-            </p>
-            <p className="text-xs text-gray-400 mt-1">
-              Браузерное расширение активно
-            </p>
-          </div>
-
-          <div className="bg-slate-700 rounded-lg p-4">
-            <div className="flex items-center space-x-2 mb-2">
-              <span className="text-lg">{getStatusIcon(diagnosticInfo.corsStatus)}</span>
-              <h3 className="font-semibold text-white">CORS</h3>
-            </div>
-            <p className="text-sm text-gray-300">
-              {getStatusText(diagnosticInfo.corsStatus)}
-            </p>
-            <p className="text-xs text-gray-400 mt-1">
-              Cross-origin запросы разрешены
-            </p>
-          </div>
-
-          <div className="bg-slate-700 rounded-lg p-4">
-            <div className="flex items-center space-x-2 mb-2">
-              <span className="text-lg">{getStatusIcon(diagnosticInfo.apiStatus)}</span>
-              <h3 className="font-semibold text-white">API</h3>
-            </div>
-            <p className="text-sm text-gray-300">
-              {getStatusText(diagnosticInfo.apiStatus)}
-            </p>
-            <p className="text-xs text-gray-400 mt-1">
-              Подключение к MEXC API
-            </p>
-          </div>
+        
+        <ul className="space-y-2">
+          {rows.map((r, i) => (
+            <li key={i} className="flex justify-between gap-4 text-slate-200">
+              <span className="opacity-80">{r.k}</span>
+              <span className={getStatusColor(r.s)}>{r.v}</span>
+            </li>
+          ))}
+        </ul>
+        
+        <div className="mt-4 text-sm text-slate-400">
+          Если «Расширение (мост): Не найдено» — проверь настройки доступа сайта в chrome://extensions и перезагрузку страницы.
         </div>
-
-        {/* Ошибки */}
-        {diagnosticInfo.errors.length > 0 && (
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-red-400 mb-3">🚨 Обнаруженные проблемы</h3>
-            <div className="space-y-2">
-              {diagnosticInfo.errors.map((error, index) => (
-                <div key={index} className="bg-red-900/20 border border-red-500/30 rounded-lg p-3">
-                  <p className="text-red-300 text-sm">{error}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Рекомендации */}
-        {diagnosticInfo.suggestions.length > 0 && (
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-blue-400 mb-3">💡 Рекомендации</h3>
-            <div className="space-y-2">
-              {diagnosticInfo.suggestions.map((suggestion, index) => (
-                <div key={index} className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-3">
-                  <p className="text-blue-300 text-sm">{suggestion}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Информация о последнем обновлении */}
-        {diagnosticInfo.lastUpdate && (
-          <div className="text-center text-gray-400 text-sm mb-4">
-            Последняя диагностика: {diagnosticInfo.lastUpdate}
-          </div>
-        )}
-
-        {/* Кнопки действий */}
-        <div className="flex space-x-3">
+        
+        <div className="mt-4 flex space-x-3">
           <button
             onClick={runDiagnostic}
             disabled={isLoading}
@@ -263,24 +140,6 @@ const DiagnosticModal: React.FC<DiagnosticModalProps> = ({ isOpen, onClose }) =>
           >
             🔧 Расширения
           </button>
-          
-          <button
-            onClick={onClose}
-            className="flex-1 bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-lg transition-colors"
-          >
-            Закрыть
-          </button>
-        </div>
-
-        {/* Справочная информация */}
-        <div className="mt-6 pt-4 border-t border-gray-600">
-          <h4 className="text-sm font-semibold text-gray-300 mb-2">📚 Справочная информация</h4>
-          <div className="text-xs text-gray-400 space-y-1">
-            <p>• <strong>Bridge</strong> - канал связи между страницей и расширением</p>
-            <p>• <strong>Расширение</strong> - должно быть активно в chrome://extensions/</p>
-            <p>• <strong>CORS</strong> - разрешает запросы к MEXC API</p>
-            <p>• <strong>API</strong> - подключение к серверам MEXC</p>
-          </div>
         </div>
       </div>
     </div>
