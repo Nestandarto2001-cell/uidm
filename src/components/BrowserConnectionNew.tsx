@@ -46,22 +46,48 @@ export const BrowserConnection: React.FC<BrowserConnectionProps> = ({
       if (orderBookData) {
         try {
           const data = JSON.parse(orderBookData);
-          if (data.bids && data.asks) {
+          console.log('Получены данные ордербука:', data);
+          if (data.bids && data.asks && (data.bids.length > 0 || data.asks.length > 0)) {
             setIsConnected(true);
             onConnectionStatus(true);
             onOrderBookData(data);
+            console.log('Подключение установлено:', data.bids.length, 'bids,', data.asks.length, 'asks');
+          } else {
+            console.log('Данные ордербука пусты');
           }
         } catch (e) {
           console.error('Error parsing order book data:', e);
         }
+      } else {
+        console.log('Нет данных ордербука в localStorage');
       }
     };
 
-    // Проверяем каждые 2 секунды
-    const interval = setInterval(checkConnection, 2000);
+    // Слушаем сообщения от расширения
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data.type === 'MEXC_ORDERBOOK_DATA') {
+        console.log('Получены данные от расширения:', event.data.payload);
+        const data = event.data.payload;
+        if (data.bids && data.asks) {
+          setIsConnected(true);
+          onConnectionStatus(true);
+          onOrderBookData(data);
+          // Сохраняем в localStorage
+          localStorage.setItem('mexc_orderbook_data', JSON.stringify(data));
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+
+    // Проверяем каждую секунду
+    const interval = setInterval(checkConnection, 1000);
     checkConnection(); // Первоначальная проверка
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('message', handleMessage);
+    };
   }, [onConnectionStatus, onOrderBookData]);
 
   // Открытие MEXC с правильным URL
@@ -142,7 +168,7 @@ export const BrowserConnection: React.FC<BrowserConnectionProps> = ({
       </div>
 
       {/* Быстрые действия */}
-      <div className="flex space-x-3 mb-4">
+      <div className="flex flex-wrap gap-3 mb-4">
         <button
           onClick={openMexcInNewTab}
           className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded transition-colors"
@@ -154,6 +180,42 @@ export const BrowserConnection: React.FC<BrowserConnectionProps> = ({
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
         >
           ⚙️ Расширения Chrome
+        </button>
+        <button
+          onClick={() => {
+            console.log('=== ДИАГНОСТИКА ПОДКЛЮЧЕНИЯ ===');
+            console.log('localStorage данные:', localStorage.getItem('mexc_orderbook_data'));
+            console.log('Текущий тикер:', currentTicker);
+            console.log('Статус подключения:', isConnected);
+            
+            // Очищаем старые данные для тестирования
+            localStorage.removeItem('mexc_orderbook_data');
+            setIsConnected(false);
+            onConnectionStatus(false);
+            console.log('Данные очищены, ожидаем новые...');
+          }}
+          className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded transition-colors"
+        >
+          🔍 Диагностика
+        </button>
+        <button
+          onClick={() => {
+            // Отправляем тестовое сообщение
+            window.postMessage({
+              type: 'MEXC_ORDERBOOK_DATA',
+              payload: {
+                bids: [[50000, 0.1], [49999, 0.2], [49998, 0.3]],
+                asks: [[50001, 0.1], [50002, 0.2], [50003, 0.3]],
+                timestamp: Date.now(),
+                url: 'test',
+                symbol: currentTicker
+              }
+            }, '*');
+            console.log('Отправлено тестовое сообщение');
+          }}
+          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors"
+        >
+          🧪 Тест данных
         </button>
       </div>
 
@@ -230,6 +292,7 @@ export const BrowserConnection: React.FC<BrowserConnectionProps> = ({
                   <li>• Включите "Режим разработчика"</li>
                   <li>• Нажмите "Загрузить распакованное расширение"</li>
                   <li>• Выберите папку "browser-extension" из проекта</li>
+                  <li>• Убедитесь, что расширение включено</li>
                 </ul>
               </div>
             </div>
@@ -241,7 +304,8 @@ export const BrowserConnection: React.FC<BrowserConnectionProps> = ({
                 <ul className="text-sm text-gray-300 mt-1 ml-4 space-y-1">
                   <li>• Нажмите кнопку "Открыть MEXC" выше</li>
                   <li>• Войдите в свой аккаунт</li>
-                  <li>• Убедитесь, что ордербук отображается</li>
+                  <li>• Перейдите на любую страницу с тикером</li>
+                  <li>• Расширение автоматически отправит тестовые данные</li>
                 </ul>
               </div>
             </div>
@@ -249,11 +313,12 @@ export const BrowserConnection: React.FC<BrowserConnectionProps> = ({
             <div className="flex items-start space-x-3">
               <div className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">3</div>
               <div className="text-white">
-                <strong>Выберите тикер:</strong>
+                <strong>Проверьте подключение:</strong>
                 <ul className="text-sm text-gray-300 mt-1 ml-4 space-y-1">
-                  <li>• Введите нужный тикер в поле "Тикер"</li>
-                  <li>• Обновите страницу MEXC</li>
-                  <li>• Ордербук должен отображаться</li>
+                  <li>• Статус должен стать зеленым "Подключен"</li>
+                  <li>• Ордербук должен заполниться тестовыми данными</li>
+                  <li>• Используйте кнопку "Диагностика" для проверки</li>
+                  <li>• Используйте кнопку "Тест данных" для проверки</li>
                 </ul>
               </div>
             </div>
@@ -263,9 +328,10 @@ export const BrowserConnection: React.FC<BrowserConnectionProps> = ({
               <div className="text-white">
                 <strong>Готово!</strong>
                 <ul className="text-sm text-gray-300 mt-1 ml-4 space-y-1">
-                  <li>• Статус должен стать зеленым</li>
-                  <li>• Ордербук обновляется автоматически</li>
-                  <li>• Работает с любыми тикерами</li>
+                  <li>• Статус "Подключен" и зеленый индикатор</li>
+                  <li>• Ордербук заполняется тестовыми данными</li>
+                  <li>• Данные обновляются каждые 2 секунды</li>
+                  <li>• Можете торговать с тестовыми данными</li>
                 </ul>
               </div>
             </div>

@@ -80,15 +80,9 @@ export const TickerAutocomplete: React.FC<TickerAutocompleteProps> = ({
 
   // Обработка ввода
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let inputValue = e.target.value.toUpperCase();
-    
-    // Автоматически добавляем _USDT если пользователь не указал валюту
-    if (inputValue && !inputValue.includes('_') && !inputValue.includes('/')) {
-      inputValue = inputValue + '_USDT';
-    }
-    
+    const inputValue = e.target.value.toUpperCase();
     onChange(inputValue);
-    setIsOpen(true);
+    setIsOpen(inputValue.length > 0);
   };
 
   // Выбор опции
@@ -160,18 +154,38 @@ export const TickerAutocomplete: React.FC<TickerAutocompleteProps> = ({
     return acc;
   }, {} as Record<string, TickerOption[]>);
 
+  // Получаем лучшее совпадение для подсветки
+  const getBestMatch = () => {
+    if (!value || filteredOptions.length === 0) return '';
+    const bestMatch = filteredOptions[0];
+    if (bestMatch.symbol.toLowerCase().startsWith(value.toLowerCase())) {
+      return bestMatch.symbol;
+    }
+    return '';
+  };
+
+  const suggestion = getBestMatch();
+
   return (
     <div className="relative">
-      <input
-        ref={inputRef}
-        type="text"
-        value={value}
-        onChange={handleInputChange}
-        onKeyDown={handleKeyDown}
-        onFocus={() => setIsOpen(true)}
-        placeholder={placeholder}
-        className={`w-full px-3 py-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 ${className}`}
-      />
+      <div className="relative">
+        <input
+          ref={inputRef}
+          type="text"
+          value={value}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          onFocus={() => setIsOpen(value.length > 0)}
+          placeholder={placeholder}
+          className={`w-full px-3 py-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 ${className}`}
+        />
+        {/* Подсветка предложения */}
+        {suggestion && value && suggestion !== value && (
+          <div className="absolute inset-0 px-3 py-2 text-gray-400 pointer-events-none">
+            {suggestion}
+          </div>
+        )}
+      </div>
       
       {isOpen && filteredOptions.length > 0 && (
         <div
