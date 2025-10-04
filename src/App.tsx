@@ -6,6 +6,7 @@ import { OrderBook } from './components/OrderBook';
 import { OrderForm } from './components/OrderForm';
 import { MyOrders } from './components/MyOrders';
 import { ApiSettings } from './components/ApiSettings';
+import { BrowserConnection } from './components/BrowserConnection';
 import { Order } from './types';
 import { CONFIG, setApiCredentials, hasApiCredentials } from './config';
 
@@ -14,9 +15,11 @@ function App() {
   const [apiKey, setApiKey] = useState<string>('');
   const [apiSecret, setApiSecret] = useState<string>('');
   const [isApiConfigured, setIsApiConfigured] = useState<boolean>(hasApiCredentials());
+  const [browserConnected, setBrowserConnected] = useState<boolean>(false);
+  const [browserOrderBook, setBrowserOrderBook] = useState<any>(null);
   
   const { isConnected, orderBook, error, sendMessage } = useWebSocket(CONFIG.mexcWsUrl, symbol);
-  const { orderBook: processedOrderBook, marketSummary, maxVolume } = useOrderBook(orderBook);
+  const { orderBook: processedOrderBook, marketSummary, maxVolume } = useOrderBook(browserOrderBook || orderBook);
   const [orders, setOrders] = useState<Order[]>([]);
   const [balance] = useState(1000); // Mock balance
 
@@ -86,6 +89,48 @@ function App() {
     console.log('Symbol changed to:', newSymbol);
   };
 
+  const handleBrowserConnection = (connected: boolean) => {
+    setBrowserConnected(connected);
+  };
+
+  const handleBrowserOrderBook = (data: any) => {
+    setBrowserOrderBook(data);
+  };
+
+  // Слушаем сообщения от расширения браузера
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data.type === 'MEXC_ORDERBOOK_DATA') {
+        setBrowserOrderBook(event.data.payload);
+        setBrowserConnected(true);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    
+    // Проверяем localStorage для данных
+    const checkLocalStorage = () => {
+      const data = localStorage.getItem('mexc_orderbook_data');
+      if (data) {
+        try {
+          const parsedData = JSON.parse(data);
+          setBrowserOrderBook(parsedData);
+          setBrowserConnected(true);
+        } catch (e) {
+          console.error('Ошибка парсинга данных из localStorage:', e);
+        }
+      }
+    };
+
+    checkLocalStorage();
+    const interval = setInterval(checkLocalStorage, 1000);
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      clearInterval(interval);
+    };
+  }, []);
+
   // Mock order updates
   useEffect(() => {
     const interval = setInterval(() => {
@@ -108,17 +153,33 @@ function App() {
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold text-white">MEXC Trading Terminal</h1>
             <div className="flex items-center space-x-4">
-              <select 
-                value={symbol}
-                onChange={(e) => handleSymbolChange(e.target.value)}
-                className="bg-gray-800 text-white px-3 py-1 rounded border border-gray-600"
-              >
-                <option value="BTCUSDT">BTC/USDT</option>
-                <option value="ETHUSDT">ETH/USDT</option>
-                <option value="ADAUSDT">ADA/USDT</option>
-                <option value="SOLUSDT">SOL/USDT</option>
-                <option value="DOTUSDT">DOT/USDT</option>
-              </select>
+              <div className="flex items-center space-x-2">
+                <label className="text-sm text-gray-300">Тикер:</label>
+                <input
+                  type="text"
+                  value={symbol}
+                  onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+                  placeholder="Введите тикер (например: BTCUSDT)"
+                  className="bg-gray-800 text-white px-3 py-1 rounded border border-gray-600 w-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="flex items-center space-x-2">
+                <label className="text-sm text-gray-300">Быстрый выбор:</label>
+                <select 
+                  onChange={(e) => handleSymbolChange(e.target.value)}
+                  className="bg-gray-800 text-white px-3 py-1 rounded border border-gray-600"
+                >
+                  <option value="">Выберите тикер</option>
+                  <option value="BTCUSDT">BTC/USDT</option>
+                  <option value="ETHUSDT">ETH/USDT</option>
+                  <option value="ADAUSDT">ADA/USDT</option>
+                  <option value="SOLUSDT">SOL/USDT</option>
+                  <option value="DOTUSDT">DOT/USDT</option>
+                  <option value="MATICUSDT">MATIC/USDT</option>
+                  <option value="AVAXUSDT">AVAX/USDT</option>
+                  <option value="LINKUSDT">LINK/USDT</option>
+                </select>
+              </div>
               <div className={`px-3 py-1 rounded text-sm ${
                 isApiConfigured ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
               }`}>
@@ -133,18 +194,63 @@ function App() {
           )}
         </div>
 
+        {/* Browser Connection */}
+        <BrowserConnection 
+          onConnectionStatus={handleBrowserConnection}
+          onOrderBookData={handleBrowserOrderBook}
+        />
+
         {/* API Settings */}
         {!isApiConfigured && (
-          <ApiSettings 
-            onApiCredentials={handleApiCredentials}
-          />
+          <div className="mb-6">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const form = e.target as typeof e.target & {
+                  apiKey: { value: string };
+                  apiSecret: { value: string };
+                };
+                handleApiCredentials(form.apiKey.value, form.apiSecret.value);
+              }}
+              className="bg-gray-800 p-4 rounded shadow max-w-md mx-auto"
+            >
+              <h2 className="text-lg font-semibold text-white mb-2">API Settings</h2>
+              <div className="mb-2">
+                <label className="block text-gray-300 mb-1" htmlFor="apiKey">API Key</label>
+                <input
+                  id="apiKey"
+                  name="apiKey"
+                  type="text"
+                  className="w-full px-3 py-2 rounded bg-gray-700 text-white border border-gray-600"
+                  required
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-gray-300 mb-1" htmlFor="apiSecret">API Secret</label>
+                <input
+                  id="apiSecret"
+                  name="apiSecret"
+                  type="password"
+                  className="w-full px-3 py-2 rounded bg-gray-700 text-white border border-gray-600"
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
+              >
+                Save API Credentials
+              </button>
+            </form>
+          </div>
         )}
 
         {/* Market Summary */}
         <MarketSummary 
           summary={marketSummary} 
-          isConnected={isConnected}
+          isConnected={browserConnected || isConnected}
           symbol={symbol}
+          browserConnected={browserConnected}
         />
 
         {/* Main Content Grid */}

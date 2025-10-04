@@ -5,9 +5,10 @@ interface MarketSummaryProps {
   summary: MarketSummaryType | null;
   isConnected: boolean;
   symbol: string;
+  browserConnected?: boolean;
 }
 
-export const MarketSummary: React.FC<MarketSummaryProps> = ({ summary, isConnected, symbol }) => {
+export const MarketSummary: React.FC<MarketSummaryProps> = ({ summary, isConnected, symbol, browserConnected }) => {
   if (!summary) {
     return (
       <div className="bg-gray-800 rounded-lg p-4 mb-4">
@@ -29,8 +30,15 @@ export const MarketSummary: React.FC<MarketSummaryProps> = ({ summary, isConnect
     <div className="bg-gray-800 rounded-lg p-4 mb-4">
         <div className="flex items-center justify-between mb-3">
           <div className="text-lg font-semibold">{symbol}</div>
-          <div className={`px-2 py-1 rounded text-xs ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}>
-            {isConnected ? 'Connected' : 'Disconnected'}
+          <div className="flex space-x-2">
+            {browserConnected && (
+              <div className="px-2 py-1 rounded text-xs bg-blue-500">
+                Browser
+              </div>
+            )}
+            <div className={`px-2 py-1 rounded text-xs ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}>
+              {isConnected ? 'Connected' : 'Disconnected'}
+            </div>
           </div>
         </div>
       

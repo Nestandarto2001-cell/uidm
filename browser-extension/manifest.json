@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "MEXC Trading Terminal Connector",
+  "version": "1.0.0",
+  "description": "Подключает терминал к MEXC для получения данных ордербука из оценочной зоны",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://www.mexc.com/*",
+    "https://mexc.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://www.mexc.com/*", "https://mexc.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "MEXC Terminal Connector"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["injected.js"],
+      "matches": ["https://www.mexc.com/*", "https://mexc.com/*"]
+    }
+  ]
+}
