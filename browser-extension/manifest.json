@@ -53,6 +53,5 @@
         "path": "rules/cors.json"
       }
     ]
-  },
-  "default_locale": "ru"
+  }
 }

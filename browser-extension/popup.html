@@ -1,57 +1,126 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MEXC Trading Helper</title>
   <style>
     body {
       width: 300px;
-      padding: 20px;
-      font-family: Arial, sans-serif;
-      background: #1f2937;
-      color: white;
+      padding: 16px;
+      margin: 0;
+      background: #0f172a;
+      color: #e2e8f0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
     }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 16px;
+    }
+    
+    .header h1 {
+      margin: 0;
+      font-size: 16px;
+      color: #00aaff;
+    }
+    
     .status {
-      padding: 10px;
-      border-radius: 5px;
-      margin: 10px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      margin-bottom: 12px;
     }
-    .connected {
-      background: #065f46;
-      border: 1px solid #10b981;
+    
+    .status-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ef4444;
     }
-    .disconnected {
-      background: #7f1d1d;
-      border: 1px solid #ef4444;
+    
+    .status-indicator.connected {
+      background: #10b981;
     }
-    button {
-      background: #3b82f6;
-      color: white;
-      border: none;
-      padding: 8px 16px;
+    
+    .status-indicator.degraded {
+      background: #f59e0b;
+    }
+    
+    .status-text {
+      font-size: 12px;
+      color: #94a3b8;
+    }
+    
+    .actions {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .btn {
+      flex: 1;
+      padding: 8px 12px;
+      background: #1e293b;
+      border: 1px solid #334155;
       border-radius: 4px;
+      color: #e2e8f0;
       cursor: pointer;
-      margin: 5px 0;
+      font-size: 12px;
+      transition: all 0.2s;
     }
-    button:hover {
-      background: #2563eb;
+    
+    .btn:hover {
+      background: #334155;
+      border-color: #475569;
+    }
+    
+    .btn.primary {
+      background: #00aaff;
+      border-color: #00aaff;
+      color: #0f172a;
+    }
+    
+    .btn.primary:hover {
+      background: #0088cc;
+      border-color: #0088cc;
+    }
+    
+    .info {
+      margin-top: 12px;
+      padding: 8px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 4px;
+      font-size: 11px;
+      color: #94a3b8;
     }
   </style>
 </head>
 <body>
-  <h3>MEXC Terminal Connector</h3>
-  
-  <div id="status" class="status disconnected">
-    Отключен от MEXC
+  <div class="header">
+    <h1>MEXC Trading Helper</h1>
   </div>
   
-  <button id="connectBtn">Подключиться</button>
-  <button id="openMexcBtn">Открыть MEXC</button>
+  <div class="status">
+    <div>
+      <div class="status-indicator" id="statusIndicator"></div>
+    </div>
+    <div class="status-text" id="statusText">Проверка...</div>
+  </div>
   
-  <div style="margin-top: 15px; font-size: 12px; color: #9ca3af;">
-    <p>1. Откройте MEXC в браузере</p>
-    <p>2. Войдите в аккаунт</p>
-    <p>3. Перейдите на страницу тикера</p>
-    <p>4. Нажмите "Подключиться"</p>
+  <div class="actions">
+    <button class="btn" id="diagnosticBtn">Диагностика</button>
+    <button class="btn primary" id="refreshBtn">Обновить</button>
+  </div>
+  
+  <div class="info">
+    <div>Версия: 0.4.0</div>
+    <div>Статус: <span id="versionStatus">Загрузка...</span></div>
   </div>
 
   <script src="popup.js"></script>

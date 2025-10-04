@@ -1,35 +1,43 @@
-// Popup script для расширения
-document.addEventListener('DOMContentLoaded', () => {
-  const statusDiv = document.getElementById('status');
-  const connectBtn = document.getElementById('connectBtn');
-  const openMexcBtn = document.getElementById('openMexcBtn');
+// Popup script для расширения MEXC Trading Helper
 
-  // Проверяем статус подключения
-  chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
-    if (tabs[0] && tabs[0].url && tabs[0].url.includes('mexc.com')) {
-      statusDiv.className = 'status connected';
-      statusDiv.textContent = 'Подключен к MEXC';
-      connectBtn.textContent = 'Отключиться';
-    }
-  });
+document.addEventListener('DOMContentLoaded', async () => {
+  const statusIndicator = document.getElementById('statusIndicator');
+  const statusText = document.getElementById('statusText');
+  const versionStatus = document.getElementById('versionStatus');
+  const diagnosticBtn = document.getElementById('diagnosticBtn');
+  const refreshBtn = document.getElementById('refreshBtn');
 
-  // Обработчик кнопки подключения
-  connectBtn.addEventListener('click', () => {
-    chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
-      if (tabs[0]) {
-        if (tabs[0].url && tabs[0].url.includes('mexc.com')) {
-          // Отправляем сообщение для отключения
-          chrome.tabs.sendMessage(tabs[0].id, {type: 'TOGGLE_CONNECTION'});
-        } else {
-          // Открываем MEXC
-          chrome.tabs.create({url: 'https://www.mexc.com'});
-        }
+  // Проверяем статус расширения
+  const checkStatus = async () => {
+    try {
+      // Проверяем доступность API MEXC
+      const response = await fetch('https://api.mexc.com/api/v3/time');
+      if (response.ok) {
+        statusIndicator.className = 'status-indicator connected';
+        statusText.textContent = 'Подключено';
+        versionStatus.textContent = 'Активно';
+      } else {
+        statusIndicator.className = 'status-indicator degraded';
+        statusText.textContent = 'Проблемы с API';
+        versionStatus.textContent = 'Частично работает';
       }
-    });
+    } catch (error) {
+      statusIndicator.className = 'status-indicator';
+      statusText.textContent = 'Не подключено';
+      versionStatus.textContent = 'Ошибка подключения';
+    }
+  };
+
+  // Обработчики кнопок
+  diagnosticBtn.addEventListener('click', () => {
+    // Открываем диагностику в новой вкладке
+    chrome.tabs.create({ url: chrome.runtime.getURL('diagnostic.html') });
   });
 
-  // Обработчик кнопки открытия MEXC
-  openMexcBtn.addEventListener('click', () => {
-    chrome.tabs.create({url: 'https://www.mexc.com'});
+  refreshBtn.addEventListener('click', () => {
+    checkStatus();
   });
+
+  // Проверяем статус при загрузке
+  checkStatus();
 });
