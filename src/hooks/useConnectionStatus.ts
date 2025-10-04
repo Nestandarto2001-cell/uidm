@@ -73,8 +73,47 @@ export function useConnectionStatus() {
     // Слушаем сообщения от расширения
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.source === 'MEXC_TT') {
+        console.log('[useConnectionStatus] Received message:', event.data);
+        
         if (event.data.type === 'EXT_READY') {
           checkStatus();
+        }
+        
+        // Обрабатываем heartbeat от расширения
+        if (event.data.type === 'MEXC_HEARTBEAT') {
+          setStatus(prev => ({
+            ...prev,
+            extState: 'live'
+          }));
+        }
+        
+        // Обрабатываем данные orderbook
+        if (event.data.type === 'MEXC_ORDERBOOK_DATA') {
+          const now = new Date();
+          setStatus(prev => ({
+            ...prev,
+            extState: 'live',
+            lastOrderBookTime: now,
+            obFresh: true
+          }));
+          
+          setFreshUpdatesCount(prev => prev + 1);
+          
+          // Сброс флага свежести через 1.5 секунды
+          setTimeout(() => {
+            setStatus(prev => ({
+              ...prev,
+              obFresh: false
+            }));
+          }, 1500);
+        }
+        
+        // Обрабатываем статус API
+        if (event.data.type === 'MEXC_API_STATUS') {
+          setStatus(prev => ({
+            ...prev,
+            apiState: event.data.status
+          }));
         }
       }
     };

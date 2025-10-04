@@ -5,6 +5,51 @@
 
 console.log('[Service Worker] Started');
 
+// Heartbeat для поддержания связи со страницей
+let heartbeatInterval = null;
+let lastHeartbeat = Date.now();
+
+// Функция отправки heartbeat на все вкладки терминала
+async function sendHeartbeat() {
+  try {
+    const tabs = await chrome.tabs.query({ url: ['http://localhost/*', 'http://127.0.0.1/*'] });
+    
+    for (const tab of tabs) {
+      try {
+        await chrome.tabs.sendMessage(tab.id, {
+          type: 'MEXC_HEARTBEAT',
+          timestamp: Date.now()
+        });
+        lastHeartbeat = Date.now();
+        console.log('[Service Worker] Heartbeat sent to tab:', tab.id);
+      } catch (error) {
+        console.log('[Service Worker] Failed to send heartbeat to tab:', tab.id, error);
+      }
+    }
+  } catch (error) {
+    console.error('[Service Worker] Error sending heartbeat:', error);
+  }
+}
+
+// Запускаем heartbeat каждые 5 секунд
+function startHeartbeat() {
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval);
+  }
+  
+  heartbeatInterval = setInterval(sendHeartbeat, 5000);
+  console.log('[Service Worker] Heartbeat started');
+}
+
+// Останавливаем heartbeat
+function stopHeartbeat() {
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval);
+    heartbeatInterval = null;
+    console.log('[Service Worker] Heartbeat stopped');
+  }
+}
+
 // API функции для работы с MEXC
 const api = {
   async probe() {
@@ -95,6 +140,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           checkInterval: 10
         };
         sendResponse({ type: 'ASSESS_STATUS_OK', status });
+      } else if (msg.type === 'PING') {
+        // Запускаем heartbeat при первом ping
+        if (!heartbeatInterval) {
+          startHeartbeat();
+        }
+        sendResponse({ type: 'PONG', timestamp: Date.now() });
       } else {
         sendResponse({ type: 'ERR', error: 'unknown_msg' });
       }
@@ -120,6 +171,11 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 // Обработка установки расширения
 chrome.runtime.onInstalled.addListener(() => {
   console.log('[Service Worker] Extension installed');
+  // Запускаем heartbeat сразу после установки
+  setTimeout(startHeartbeat, 1000);
 });
+
+// Запускаем heartbeat при старте service worker
+startHeartbeat();
 
 console.log('[Service Worker] Ready');

@@ -20,6 +20,7 @@ interface DiagnosticRow {
 const DiagnosticModal: React.FC<DiagnosticModalProps> = ({ isOpen, onClose }) => {
   const [rows, setRows] = useState<DiagnosticRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [heartbeatStatus, setHeartbeatStatus] = useState<'waiting' | 'connected' | 'disconnected'>('waiting');
 
   const runDiagnostic = async () => {
     setIsLoading(true);
@@ -60,6 +61,13 @@ const DiagnosticModal: React.FC<DiagnosticModalProps> = ({ isOpen, onClose }) =>
       // URL страницы
       r.push({ k: 'URL страницы', v: window.location.href, s: 'ok' });
 
+      // Heartbeat статус
+      r.push({ 
+        k: 'Heartbeat от расширения', 
+        v: heartbeatStatus === 'connected' ? 'Получен' : heartbeatStatus === 'waiting' ? 'Ожидание...' : 'Не получен', 
+        s: heartbeatStatus === 'connected' ? 'ok' : heartbeatStatus === 'waiting' ? 'warn' : 'err' 
+      });
+
       // Время диагностики
       r.push({ k: 'Время диагностики', v: new Date().toLocaleString('ru-RU'), s: 'ok' });
 
@@ -81,64 +89,93 @@ const DiagnosticModal: React.FC<DiagnosticModalProps> = ({ isOpen, onClose }) =>
   useEffect(() => {
     if (isOpen) {
       runDiagnostic();
+      
+      // Слушаем heartbeat сообщения
+      const handleHeartbeat = (event: MessageEvent) => {
+        if (event.data?.source === 'MEXC_TT' && event.data?.type === 'MEXC_HEARTBEAT') {
+          setHeartbeatStatus('connected');
+          console.log('[Diagnostic] Heartbeat received:', event.data);
+        }
+      };
+      
+      window.addEventListener('message', handleHeartbeat);
+      
+      // Таймаут для heartbeat
+      const heartbeatTimeout = setTimeout(() => {
+        if (heartbeatStatus === 'waiting') {
+          setHeartbeatStatus('disconnected');
+        }
+      }, 10000);
+      
+      return () => {
+        window.removeEventListener('message', handleHeartbeat);
+        clearTimeout(heartbeatTimeout);
+      };
     }
-  }, [isOpen]);
+  }, [isOpen, heartbeatStatus]);
+
+  // Перезапускаем диагностику при изменении статуса heartbeat
+  useEffect(() => {
+    if (isOpen && heartbeatStatus !== 'waiting') {
+      runDiagnostic();
+    }
+  }, [heartbeatStatus, isOpen]);
 
   const getStatusColor = (s?: 'ok' | 'err' | 'warn') => {
     switch (s) {
       case 'ok':
-        return 'text-emerald-400';
+        return 'text-green-400';
       case 'warn':
-        return 'text-amber-400';
+        return 'text-yellow-400';
       case 'err':
-        return 'text-rose-400';
+        return 'text-red-400';
       default:
-        return 'text-slate-400';
+        return 'text-gray-400';
     }
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60">
-      <div className="w-[720px] rounded-2xl p-6 bg-[#0f172a] border border-[#1f2a44] shadow-xl">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-semibold text-slate-100">🔍 Диагностика</h3>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/80">
+      <div className="w-[600px] rounded-lg p-8 bg-black border border-gray-800">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-white">Диагностика</h3>
           <button 
             onClick={onClose} 
-            className="px-3 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
+            className="px-4 py-2 rounded-md bg-white hover:bg-gray-100 text-black transition-colors font-medium"
           >
             Закрыть
           </button>
         </div>
         
-        <ul className="space-y-2">
+        <ul className="space-y-3">
           {rows.map((r, i) => (
-            <li key={i} className="flex justify-between gap-4 text-slate-200">
-              <span className="opacity-80">{r.k}</span>
+            <li key={i} className="flex justify-between gap-4 text-white">
+              <span className="text-gray-400">{r.k}</span>
               <span className={getStatusColor(r.s)}>{r.v}</span>
             </li>
           ))}
         </ul>
         
-        <div className="mt-4 text-sm text-slate-400">
+        <div className="mt-6 text-sm text-gray-400">
           Если «Расширение (мост): Не найдено» — проверь настройки доступа сайта в chrome://extensions и перезагрузку страницы.
         </div>
         
-        <div className="mt-4 flex space-x-3">
+        <div className="mt-6 flex space-x-3">
           <button
             onClick={runDiagnostic}
             disabled={isLoading}
-            className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:opacity-50 text-white px-4 py-2 rounded-lg transition-colors"
+            className="flex-1 bg-white hover:bg-gray-100 disabled:bg-gray-300 disabled:opacity-50 text-black px-4 py-2 rounded-md transition-colors font-medium"
           >
-            {isLoading ? 'Проверяем...' : '🔄 Повторить диагностику'}
+            {isLoading ? 'Проверяем...' : 'Повторить диагностику'}
           </button>
           
           <button
             onClick={() => window.open('chrome://extensions/', '_blank')}
-            className="flex-1 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
+            className="flex-1 bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-md transition-colors font-medium"
           >
-            🔧 Расширения
+            Расширения
           </button>
         </div>
       </div>
