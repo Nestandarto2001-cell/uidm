@@ -1,19 +1,28 @@
-import React, { useState, useEffect } from 'react';
-import { useWebSocket } from './hooks/useWebSocket';
-import { useOrderBook } from './hooks/useOrderBook';
-import { MarketSummary } from './components/MarketSummary';
-import { OrderBook } from './components/OrderBook';
+import React, { useState } from "react";
+import { useWebSocket } from "./hooks/useWebSocket";
+import { useOrderBook } from "./hooks/useOrderBook";
+import { MarketSummary } from "./components/MarketSummary";
+import { OrderBook } from "./components/OrderBook";
 import { OrderForm } from './components/OrderForm';
 import { MyOrders } from './components/MyOrders';
-import { ApiSettings } from './components/ApiSettings';
-import { BrowserConnection } from './components/BrowserConnection';
+import { UserProfiles } from './components/UserProfiles';
+import { BrowserConnection } from './components/BrowserConnectionNew';
 import { Order } from './types';
 import { CONFIG, setApiCredentials, hasApiCredentials } from './config';
 
+interface UserProfile {
+  id: string;
+  name: string;
+  uid: string;
+  apiKey: string;
+  apiSecret: string;
+  rememberData: boolean;
+  isActive: boolean;
+}
+
 function App() {
   const [symbol, setSymbol] = useState<string>(CONFIG.defaultSymbol);
-  const [apiKey, setApiKey] = useState<string>('');
-  const [apiSecret, setApiSecret] = useState<string>('');
+  const [currentProfile, setCurrentProfile] = useState<UserProfile | null>(null);
   const [isApiConfigured, setIsApiConfigured] = useState<boolean>(hasApiCredentials());
   const [browserConnected, setBrowserConnected] = useState<boolean>(false);
   const [browserOrderBook, setBrowserOrderBook] = useState<any>(null);
@@ -79,8 +88,6 @@ function App() {
   const handleApiCredentials = (key: string, secret: string) => {
     setApiCredentials(key, secret);
     setIsApiConfigured(true);
-    setApiKey(key);
-    setApiSecret(secret);
     console.log('API credentials configured');
   };
 
@@ -97,8 +104,18 @@ function App() {
     setBrowserOrderBook(data);
   };
 
+  const handleProfileSelect = (profile: UserProfile | null) => {
+    setCurrentProfile(profile);
+    if (profile) {
+      // Обновляем конфигурацию API из профиля
+      if (profile.apiKey && profile.apiSecret) {
+        handleApiCredentials(profile.apiKey, profile.apiSecret);
+      }
+    }
+  };
+
   // Слушаем сообщения от расширения браузера
-  useEffect(() => {
+  React.useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data.type === 'MEXC_ORDERBOOK_DATA') {
         setBrowserOrderBook(event.data.payload);
@@ -132,7 +149,7 @@ function App() {
   }, []);
 
   // Mock order updates
-  useEffect(() => {
+  React.useEffect(() => {
     const interval = setInterval(() => {
       setOrders(prev => prev.map(order => {
         if (order.status === 'pending' && Math.random() > 0.8) {
@@ -196,10 +213,17 @@ function App() {
           )}
         </div>
 
+        {/* User Profiles */}
+        <UserProfiles
+          onProfileSelect={handleProfileSelect}
+          onApiCredentials={handleApiCredentials}
+        />
+
         {/* Browser Connection */}
         <BrowserConnection
           onConnectionStatus={handleBrowserConnection}
           onOrderBookData={handleBrowserOrderBook}
+          currentTicker={symbol}
         />
 
         {/* API Settings */}

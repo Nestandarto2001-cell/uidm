@@ -155,7 +155,8 @@ export const BrowserConnection: React.FC<BrowserConnectionProps> = ({
       `;
       
       try {
-        iframe.contentWindow.eval(script);
+        // Используем postMessage вместо eval для безопасности
+        iframe.contentWindow?.postMessage({ type: 'INJECT_SCRIPT', script }, '*');
         setIsConnected(true);
         onConnectionStatus(true);
       } catch (e) {
