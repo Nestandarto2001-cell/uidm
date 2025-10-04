@@ -18,6 +18,8 @@ import { ExtensionPanel } from './components/ExtensionPanel';
 import { ProfileCreateModal } from './components/ProfileCreateModal';
 import TabNavigation from './components/TabNavigation';
 import AssessmentZone from './components/AssessmentZone';
+import ConnectionMethods from './components/ConnectionMethods';
+import HelpSection from './components/HelpSection';
 import { Order } from './types';
 import { CONFIG, setApiCredentials, hasApiCredentials } from './config';
 
@@ -39,7 +41,7 @@ function App() {
   const [browserOrderBook, setBrowserOrderBook] = useState<any>(null);
   const [isSymbolPickerOpen, setIsSymbolPickerOpen] = useState(false);
   const [isExtensionPanelOpen, setIsExtensionPanelOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'trading' | 'assessment'>('trading');
+  const [activeTab, setActiveTab] = useState<'trading' | 'assessment' | 'connection'>('trading');
   
   const { isConnected, orderBook, error, sendMessage } = useWebSocket(CONFIG.mexcWsUrl, symbol);
   
@@ -324,9 +326,14 @@ function App() {
               </div>
             </div>
           </>
-        ) : (
-          <AssessmentZone />
-        )}
+                    ) : activeTab === 'assessment' ? (
+                      <AssessmentZone />
+                    ) : (
+                      <div className="space-y-6">
+                        <ConnectionMethods />
+                        <HelpSection />
+                      </div>
+                    )}
       </div>
       
       {/* Modals */}

@@ -5,7 +5,7 @@
 
 import React from 'react';
 
-export type TabType = 'trading' | 'assessment';
+export type TabType = 'trading' | 'assessment' | 'connection';
 
 interface TabNavigationProps {
   activeTab: TabType;
@@ -18,7 +18,8 @@ const TabNavigation: React.FC<TabNavigationProps> = ({
 }) => {
   const tabs = [
     { id: 'trading' as TabType, label: 'Trading Terminal', icon: '📈' },
-    { id: 'assessment' as TabType, label: 'Assessment Zone', icon: '🔍' }
+    { id: 'assessment' as TabType, label: 'Assessment Zone', icon: '🔍' },
+    { id: 'connection' as TabType, label: 'Подключение', icon: '🔌' }
   ];
 
   return (

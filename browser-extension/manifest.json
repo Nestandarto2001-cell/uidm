@@ -10,7 +10,10 @@
   ],
   "host_permissions": [
     "https://www.mexc.com/*",
-    "https://www.mexc.*/*",
+    "https://futures.mexc.com/*",
+    "https://contract.mexc.com/*",
+    "https://mexcterminal.com/*",
+    "https://*.mexc.com/*",
     "http://localhost/*",
     "http://127.0.0.1/*"
   ],
@@ -22,7 +25,8 @@
     {
       "matches": [
         "http://localhost/*",
-        "http://127.0.0.1/*"
+        "http://127.0.0.1/*",
+        "https://mexcterminal.com/*"
       ],
       "js": ["terminal-bridge.js"],
       "run_at": "document_start",
@@ -32,7 +36,9 @@
       "name": "mexc-content",
       "matches": [
         "https://www.mexc.com/*",
-        "https://mexc.com/*"
+        "https://mexc.com/*",
+        "https://futures.mexc.com/*",
+        "https://contract.mexc.com/*"
       ],
       "js": ["content_mexc.js"],
       "run_at": "document_idle",
