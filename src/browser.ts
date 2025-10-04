@@ -1,5 +1,7 @@
 import { chromium, Browser, Page } from "playwright";
 import { CONFIG } from "./config";
+import { log } from "./logger";
+import { errorHandler, AppError } from "./errorHandler";
 
 export class MexcBrowser {
   private browser!: Browser;
@@ -10,11 +12,22 @@ export class MexcBrowser {
 
   async start() {
     if (!CONFIG.mexcUid) {
-      throw new Error("MEXC_UID не установлен! Установите переменную окружения MEXC_UID или добавьте в config.ts");
+      log.error("MEXC_UID не установлен", { 
+        error: "MEXC_UID не установлен! Установите переменную окружения MEXC_UID или добавьте в config.ts" 
+      });
+      throw new AppError("MEXC_UID не установлен! Установите переменную окружения MEXC_UID или добавьте в config.ts", 400);
     }
 
-    this.browser = await chromium.launch({ headless: CONFIG.headless });
-    const ctx = await this.browser.newContext();
+    try {
+      log.browser("Starting browser", { headless: CONFIG.headless });
+      
+      this.browser = await errorHandler.withTimeout(
+        chromium.launch({ headless: CONFIG.headless }),
+        CONFIG.browserTimeout,
+        "Browser launch"
+      );
+      
+      const ctx = await this.browser.newContext();
     
     // Устанавливаем UID cookie
     await ctx.addCookies([{
@@ -28,11 +41,16 @@ export class MexcBrowser {
     
     this.page = await ctx.newPage();
     
-    // Проверяем статус авторизации
-    await this.checkAuthStatus();
-    
-    // Запускаем мониторинг статуса
-    this.startStatusMonitoring();
+      // Проверяем статус авторизации
+      await this.checkAuthStatus();
+      
+      // Запускаем мониторинг статуса
+      this.startStatusMonitoring();
+      
+    } catch (error) {
+      log.error("Failed to start browser", { error: error instanceof Error ? error.message : String(error) });
+      errorHandler.handleBrowserError(error, "Browser start");
+    }
   }
 
   onStatusChange(callback: (status: { working: boolean, error?: string }) => void) {
@@ -59,16 +77,16 @@ export class MexcBrowser {
       if (isLoggedIn) {
         this.retryCount = 0;
         this.notifyStatus(true);
-        console.log("✅ Авторизация успешна");
+        log.auth("success", { retryCount: this.retryCount });
         return true;
       } else {
         this.notifyStatus(false, "Не авторизован - проверьте UID");
-        console.warn("⚠️ Не авторизован - проверьте UID");
+        log.auth("failed", { reason: "Не авторизован - проверьте UID" });
         return false;
       }
     } catch (error) {
       this.notifyStatus(false, `Ошибка проверки авторизации: ${error}`);
-      console.error("❌ Ошибка проверки авторизации:", error);
+      log.auth("failed", { error: error instanceof Error ? error.message : String(error) });
       return false;
     }
   }
@@ -150,48 +168,82 @@ export class MexcBrowser {
 
   async placeLimit(side: "buy"|"sell", price: number, amount: number) {
     if (!this.isWorking) {
-      throw new Error("Браузер не авторизован - проверьте UID");
+      throw new AppError("Браузер не авторизован - проверьте UID", 401);
     }
     
-    await this.selectLimitTab();
+    try {
+      log.trade("placeLimit_attempt", "", { side, price, amount });
+      
+      await errorHandler.withRetry(
+        async () => {
+          await this.selectLimitTab();
+          
+          // Поиск полей цены/количества (несколько стратегий)
+          const priceInput = this.page.locator('input[placeholder*="Цена"], input[name*="price"], input[aria-label*="Цена"]').first();
+          const qtyInput   = this.page.locator('input[placeholder*="Кол"], input[name*="amount"], input[aria-label*="Кол"]').first();
 
-    // Поиск полей цены/количества (несколько стратегий)
-    const priceInput = this.page.locator('input[placeholder*="Цена"], input[name*="price"], input[aria-label*="Цена"]').first();
-    const qtyInput   = this.page.locator('input[placeholder*="Кол"], input[name*="amount"], input[aria-label*="Кол"]').first();
+          await priceInput.fill(String(price));
+          await qtyInput.fill(String(amount));
 
-    await priceInput.fill(String(price));
-    await qtyInput.fill(String(amount));
+          // Кнопки купить/продать
+          const buyBtn  = this.page.locator('button:has-text("Купить"), button:has-text("Buy")').first();
+          const sellBtn = this.page.locator('button:has-text("Продать"), button:has-text("Sell")').first();
 
-    // Кнопки купить/продать
-    const buyBtn  = this.page.locator('button:has-text("Купить"), button:has-text("Buy")').first();
-    const sellBtn = this.page.locator('button:has-text("Продать"), button:has-text("Sell")').first();
+          const btn = side === "buy" ? buyBtn : sellBtn;
+          await btn.click();
 
-    const btn = side === "buy" ? buyBtn : sellBtn;
-    await btn.click();
-
-    // Если всплывёт подтверждение — жмём подтверждение:
-    const confirm = this.page.locator('button:has-text("Подтвердить"), button:has-text("Confirm")').first();
-    if (await confirm.count()) await confirm.click();
+          // Если всплывёт подтверждение — жмём подтверждение:
+          const confirm = this.page.locator('button:has-text("Подтвердить"), button:has-text("Confirm")').first();
+          if (await confirm.count()) await confirm.click();
+        },
+        CONFIG.apiRetries,
+        1000,
+        "placeLimit"
+      );
+      
+      log.trade("placeLimit_success", "", { side, price, amount });
+      
+    } catch (error) {
+      log.error("placeLimit failed", { side, price, amount, error: error instanceof Error ? error.message : String(error) });
+      errorHandler.handleBrowserError(error, "placeLimit");
+    }
   }
 
   async placeMarket(side: "buy"|"sell", amount: number) {
     if (!this.isWorking) {
-      throw new Error("Браузер не авторизован - проверьте UID");
+      throw new AppError("Браузер не авторизован - проверьте UID", 401);
     }
     
-    // Переключиться на "Рынок"
-    const marketBtn = await this.page.locator('button:has-text("Рынок"), [role="tab"]:has-text("Рынок")').first();
-    if (await marketBtn.count()) await marketBtn.click();
+    try {
+      log.trade("placeMarket_attempt", "", { side, amount });
+      
+      await errorHandler.withRetry(
+        async () => {
+          // Переключиться на "Рынок"
+          const marketBtn = await this.page.locator('button:has-text("Рынок"), [role="tab"]:has-text("Рынок")').first();
+          if (await marketBtn.count()) await marketBtn.click();
 
-    const qtyInput   = this.page.locator('input[placeholder*="Кол"], input[name*="amount"], input[aria-label*="Кол"]').first();
-    await qtyInput.fill(String(amount));
+          const qtyInput   = this.page.locator('input[placeholder*="Кол"], input[name*="amount"], input[aria-label*="Кол"]').first();
+          await qtyInput.fill(String(amount));
 
-    const buyBtn  = this.page.locator('button:has-text("Купить"), button:has-text("Buy")').first();
-    const sellBtn = this.page.locator('button:has-text("Продать"), button:has-text("Sell")').first();
-    await (side === "buy" ? buyBtn : sellBtn).click();
+          const buyBtn  = this.page.locator('button:has-text("Купить"), button:has-text("Buy")').first();
+          const sellBtn = this.page.locator('button:has-text("Продать"), button:has-text("Sell")').first();
+          await (side === "buy" ? buyBtn : sellBtn).click();
 
-    const confirm = this.page.locator('button:has-text("Подтвердить"), button:has-text("Confirm")').first();
-    if (await confirm.count()) await confirm.click();
+          const confirm = this.page.locator('button:has-text("Подтвердить"), button:has-text("Confirm")').first();
+          if (await confirm.count()) await confirm.click();
+        },
+        CONFIG.apiRetries,
+        1000,
+        "placeMarket"
+      );
+      
+      log.trade("placeMarket_success", "", { side, amount });
+      
+    } catch (error) {
+      log.error("placeMarket failed", { side, amount, error: error instanceof Error ? error.message : String(error) });
+      errorHandler.handleBrowserError(error, "placeMarket");
+    }
   }
 
   pageRef() { return this.page; }

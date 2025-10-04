@@ -2,12 +2,86 @@ import express from "express";
 import { WebSocketServer } from "ws";
 import path from "path";
 import { fileURLToPath } from "url";
+import { log } from "./logger";
+import { HealthChecker } from "./healthCheck";
+import { apiRateLimiter, healthRateLimiter, wsRateLimitMiddleware } from "./rateLimiter";
+import { backupManager } from "./backupStrategy";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export function startHttpServer() {
+export function startHttpServer(healthChecker?: HealthChecker) {
   const app = express();
-  const server = app.listen(3000, () => console.log("UI: http://localhost:3000"));
+  
+  // Middleware для парсинга JSON
+  app.use(express.json());
+  
+  const server = app.listen(3000, () => {
+    log.info("HTTP server started", { port: 3000, url: "http://localhost:3000" });
+  });
+
+  // Health check endpoints с rate limiting
+  app.get("/health", healthRateLimiter, async (_req: any, res: any) => {
+    try {
+      if (!healthChecker) {
+        res.status(503).json({ 
+          status: 'unhealthy', 
+          message: 'Health checker not initialized' 
+        });
+        return;
+      }
+      
+      const health = await healthChecker.checkHealth();
+      const statusCode = health.status === 'healthy' ? 200 : 
+                        health.status === 'degraded' ? 200 : 503;
+      
+      res.status(statusCode).json(health);
+    } catch (error) {
+      log.error("Health check endpoint error", { 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+      res.status(503).json({ 
+        status: 'unhealthy', 
+        message: 'Health check failed' 
+      });
+    }
+  });
+
+  app.get("/health/quick", healthRateLimiter, async (_req: any, res: any) => {
+    try {
+      if (!healthChecker) {
+        res.status(503).json({ 
+          status: 'unhealthy', 
+          message: 'Health checker not initialized' 
+        });
+        return;
+      }
+      
+      const status = await healthChecker.getQuickStatus();
+      const statusCode = status.status === 'healthy' ? 200 : 503;
+      
+      res.status(statusCode).json(status);
+    } catch (error) {
+      res.status(503).json({ 
+        status: 'unhealthy', 
+        message: 'Health check failed' 
+      });
+    }
+  });
+
+  // Backup strategies statistics endpoint
+  app.get("/backup/stats", apiRateLimiter, (_req: any, res: any) => {
+    try {
+      const stats = backupManager.getFallbackStats();
+      res.json(stats);
+    } catch (error) {
+      log.error("Backup stats endpoint error", { 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+      res.status(500).json({ 
+        error: 'Failed to get backup statistics' 
+      });
+    }
+  });
 
   app.get("/", (_req: any, res: any) => {
     res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -164,5 +238,24 @@ export function startHttpServer() {
   });
 
   const wss = new WebSocketServer({ server });
+  
+  // Регистрируем WebSocket клиентов в health checker с rate limiting
+  wss.on('connection', (ws, req) => {
+    // Проверяем rate limit для WebSocket подключений
+    if (!wsRateLimitMiddleware(ws, req)) {
+      return;
+    }
+    
+    if (healthChecker) {
+      healthChecker.registerWebSocketClient(ws);
+    }
+    
+    ws.on('close', () => {
+      if (healthChecker) {
+        healthChecker.unregisterWebSocketClient(ws);
+      }
+    });
+  });
+  
   return { app, wss };
 }

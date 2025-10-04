@@ -2,6 +2,11 @@ import { startHttpServer } from "./server";
 import { MexcApi } from "./mexc_ccxt";
 import { MexcBrowser } from "./browser";
 import { CONFIG } from "./config";
+import { log } from "./logger";
+import { errorHandler } from "./errorHandler";
+import { HealthChecker } from "./healthCheck";
+import { tradingRateLimitMiddleware } from "./rateLimiter";
+import { initializeBackupStrategies } from "./backupStrategy";
 
 type OB = { bids: [number,number][], asks: [number,number][] };
 
@@ -12,8 +17,12 @@ const api = new MexcApi({
 });
 
 (async () => {
-  const { wss } = startHttpServer();
+  // Инициализируем резервные стратегии
+  const backupStrategies = initializeBackupStrategies();
+  
   const browser = new MexcBrowser();
+  const healthChecker = new HealthChecker(api, browser);
+  const { wss } = startHttpServer(healthChecker);
   
   // Подписываемся на изменения статуса браузера
   browser.onStatusChange((status) => {
@@ -26,9 +35,9 @@ const api = new MexcApi({
     });
     
     if (!status.working) {
-      console.error(`❌ Браузер не работает: ${status.error}`);
+      log.error("Браузер не работает", { error: status.error });
     } else {
-      console.log("✅ Браузер работает нормально");
+      log.info("Браузер работает нормально");
     }
   });
   
@@ -40,17 +49,37 @@ const api = new MexcApi({
   async function fetchOB(): Promise<OB> {
     try {
       if (await api.canTrade(symbol)) {
-        const ob = await api.orderBook(symbol);
-        return {
+        const ob = await api.orderBook(symbol) as any;
+        const processedOB = {
           bids: ob.bids.map(([p,q]: any)=>[Number(p), Number(q)]),
           asks: ob.asks.map(([p,q]: any)=>[Number(p), Number(q)]),
         };
+        
+        // Кэшируем данные
+        backupStrategies.cacheStrategy.set(`orderbook:${symbol}`, processedOB, 5000); // 5 секунд
+        
+        return processedOB;
       } else {
         await browser.gotoSpot(symbol);
-        return await browser.readOrderBook();
+        const ob = await browser.readOrderBook();
+        
+        // Кэшируем данные браузера
+        backupStrategies.cacheStrategy.set(`orderbook:browser:${symbol}`, ob, 10000); // 10 секунд
+        
+        return ob;
       }
     } catch (e) {
-      console.error("OB error", e);
+      log.error("OB error", { symbol, error: e instanceof Error ? e.message : String(e) });
+      
+      // Пытаемся получить данные из кэша
+      const cachedData = backupStrategies.cacheStrategy.get(`orderbook:${symbol}`) ||
+                        backupStrategies.cacheStrategy.get(`orderbook:browser:${symbol}`);
+      
+      if (cachedData) {
+        log.info("Using cached orderbook data", { symbol });
+        return cachedData;
+      }
+      
       return lastOB;
     }
   }
@@ -65,17 +94,42 @@ const api = new MexcApi({
           // сразу подтянуть страницу, если надо
           try { await browser.gotoSpot(symbol); } catch {}
         } else if (msg.type === "order") {
+          // Проверяем rate limit для торговых операций
+          if (!tradingRateLimitMiddleware(ws, { socket: { remoteAddress: 'unknown' } })) {
+            return;
+          }
+          
           const { kind, side, price, amount } = msg.payload || {};
-          if (await api.canTrade(symbol)) {
+          const useApi = await api.canTrade(symbol);
+          
+          log.trade("order_attempt", symbol, {
+            kind,
+            side,
+            price,
+            amount,
+            method: useApi ? "api" : "browser"
+          });
+          
+          if (useApi) {
             // через API
             await api.createOrder(symbol, side, kind, amount, price);
+            log.trade("order_success", symbol, { method: "api", kind, side });
           } else {
             // через браузер
-            if (kind === "limit") await browser.placeLimit(side, Number(price), Number(amount));
-            else await browser.placeMarket(side, Number(amount));
+            if (kind === "limit") {
+              await browser.placeLimit(side, Number(price), Number(amount));
+              log.trade("order_success", symbol, { method: "browser", kind: "limit", side });
+            } else {
+              await browser.placeMarket(side, Number(amount));
+              log.trade("order_success", symbol, { method: "browser", kind: "market", side });
+            }
           }
         }
       } catch (e:any) {
+        log.error("WebSocket message error", { 
+          error: e?.message || "unknown error",
+          message: raw.toString()
+        });
         ws.send(JSON.stringify({type:"error", payload: e?.message || "unknown error"}));
       }
     });
@@ -91,8 +145,39 @@ const api = new MexcApi({
     }
   }, CONFIG.pollMs);
 
-  process.on("SIGINT", async () => {
-    await browser.stop();
-    process.exit(0);
+  // периодическая проверка здоровья системы
+  setInterval(async () => {
+    try {
+      const health = await healthChecker.checkHealth();
+      if (health.status !== 'healthy') {
+        log.warn("System health degraded", { 
+          status: health.status,
+          components: Object.keys(health.components).filter(
+            key => health.components[key as keyof typeof health.components].status !== 'healthy'
+          )
+        });
+      }
+    } catch (error) {
+      log.error("Health check failed", { 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  }, 60000); // каждую минуту
+
+  // Graceful shutdown
+  process.on("SIGINT", () => {
+    errorHandler.gracefulShutdown("SIGINT", async () => {
+      log.info("Stopping browser...");
+      await browser.stop();
+      log.info("Application stopped gracefully");
+    });
+  });
+
+  process.on("SIGTERM", () => {
+    errorHandler.gracefulShutdown("SIGTERM", async () => {
+      log.info("Stopping browser...");
+      await browser.stop();
+      log.info("Application stopped gracefully");
+    });
   });
 })();
