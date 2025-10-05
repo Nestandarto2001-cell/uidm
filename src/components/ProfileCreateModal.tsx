@@ -1,8 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useProfilesStore } from '../stores/profilesStore';
 
+interface UserProfile {
+  id: string;
+  name: string;
+  uid: string;
+  apiKey: string;
+  apiSecret: string;
+  rememberData: boolean;
+  isActive: boolean;
+}
+
 export const ProfileCreateModal: React.FC = () => {
-  const { createOpen, closeCreateModal, create } = useProfilesStore();
+  const { createOpen, closeCreateModal, create, update } = useProfilesStore();
   const [formData, setFormData] = useState({
     name: '',
     uid: '',
@@ -10,6 +20,8 @@ export const ProfileCreateModal: React.FC = () => {
     apiSecret: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [editMode, setEditMode] = useState(false);
+  const [editingProfile, setEditingProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
     if (createOpen) {
@@ -21,8 +33,34 @@ export const ProfileCreateModal: React.FC = () => {
         apiSecret: '',
       });
       setErrors({});
+      setEditMode(false);
+      setEditingProfile(null);
     }
   }, [createOpen]);
+
+  // Слушаем событие открытия модального окна для редактирования
+  useEffect(() => {
+    const handleOpenProfileModal = (event: CustomEvent) => {
+      const { profile, mode } = event.detail;
+      if (mode === 'edit' && profile) {
+        setEditMode(true);
+        setEditingProfile(profile);
+        setFormData({
+          name: profile.name,
+          uid: profile.uid,
+          apiKey: profile.apiKey,
+          apiSecret: profile.apiSecret,
+        });
+        setErrors({});
+        // Открываем модальное окно
+        const createEvent = new CustomEvent('openCreateModal');
+        window.dispatchEvent(createEvent);
+      }
+    };
+
+    window.addEventListener('openProfileModal', handleOpenProfileModal as EventListener);
+    return () => window.removeEventListener('openProfileModal', handleOpenProfileModal as EventListener);
+  }, []);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -58,7 +96,13 @@ export const ProfileCreateModal: React.FC = () => {
       apiSecret: formData.apiSecret.trim() || undefined,
     };
 
-    create(profileData);
+    if (editMode && editingProfile) {
+      // Обновляем существующий профиль
+      update(editingProfile.id, profileData);
+    } else {
+      // Создаем новый профиль
+      create(profileData);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -88,7 +132,9 @@ export const ProfileCreateModal: React.FC = () => {
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-slate-600/50">
-          <h2 className="text-lg font-semibold text-slate-200">Create New Profile</h2>
+          <h2 className="text-lg font-semibold text-slate-200">
+            {editMode ? 'Редактировать профиль' : 'Создать профиль'}
+          </h2>
           <button
             onClick={closeCreateModal}
             className="text-slate-400 hover:text-slate-200 text-xl"
@@ -188,7 +234,7 @@ export const ProfileCreateModal: React.FC = () => {
               type="submit"
               className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white transition-colors"
             >
-              Save
+              {editMode ? 'Сохранить изменения' : 'Создать профиль'}
             </button>
           </div>
         </form>

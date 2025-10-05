@@ -17,3 +17,21 @@ export default function Tooltip({ text, children }: TooltipProps) {
     </span>
   );
 }
+
+// TooltipButton - кнопка с tooltip
+interface TooltipButtonProps {
+  text: string;
+  children: React.ReactNode;
+  onClick?: () => void;
+  className?: string;
+}
+
+export const TooltipButton: React.FC<TooltipButtonProps> = ({ text, children, onClick, className }) => {
+  return (
+    <Tooltip text={text}>
+      <button onClick={onClick} className={className}>
+        {children}
+      </button>
+    </Tooltip>
+  );
+};

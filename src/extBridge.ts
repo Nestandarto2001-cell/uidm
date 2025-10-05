@@ -29,7 +29,20 @@ window.addEventListener('message', (e) => {
 });
 
 export function extIsReady(): boolean { 
-  return ready; 
+  // Проверяем несколько способов определения готовности расширения
+  const hasContentScript = document.querySelector('script[src*="content.js"]') !== null;
+  const hasExtensionAPI = typeof window !== 'undefined' && 
+    typeof (window as any).chrome !== 'undefined' && 
+    (window as any).chrome.runtime;
+  
+  console.log('[ExtBridge] Extension status check:', {
+    ready,
+    hasContentScript,
+    hasExtensionAPI,
+    userAgent: navigator.userAgent.includes('Chrome') || navigator.userAgent.includes('Edge')
+  });
+  
+  return ready || hasExtensionAPI;
 }
 
 function ask(type: string, payload: any = {}) {
@@ -87,8 +100,21 @@ export async function getAssessmentStatus() {
 // Ping функция для проверки связи
 export async function ping(): Promise<boolean> {
   try {
+    console.log('[ExtBridge] Sending ping...');
     const response = await ask('PING');
-    return response.type === 'PONG';
+    console.log('[ExtBridge] Ping response:', response);
+    
+    if (response && typeof response === 'object' && (response as any).type === 'PONG') {
+      return true;
+    }
+    
+    // Fallback: если нет PONG, но есть ответ от расширения
+    if (response && typeof response === 'object') {
+      console.log('[ExtBridge] Got response but not PONG, considering as connected');
+      return true;
+    }
+    
+    return false;
   } catch (error) {
     console.error('[ExtBridge] Ping failed:', error);
     return false;

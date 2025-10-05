@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tooltip } from './Tooltip';
+import Tooltip from './SimpleTooltip';
 
 interface TopActionsProps {
   onOpenMexc: () => void;
@@ -30,7 +30,7 @@ export const TopActions: React.FC<TopActionsProps> = ({
           Открыть MEXC
           <span className="ml-2 text-slate-400">?</span>
         </button>
-        <Tooltip content="Открывает вкладку биржи для текущего тикера" position="bottom">
+        <Tooltip text="Открывает вкладку биржи для текущего тикера">
           <div className="absolute inset-0 pointer-events-none" />
         </Tooltip>
       </div>
@@ -44,7 +44,7 @@ export const TopActions: React.FC<TopActionsProps> = ({
           Расширение
           <span className="ml-2 text-slate-400">?</span>
         </button>
-        <Tooltip content="Мост к стакану со страницы MEXC. Нужен для оценочной зоны" position="bottom">
+        <Tooltip text="Мост к стакану со страницы MEXC. Нужен для оценочной зоны">
           <div className="absolute inset-0 pointer-events-none" />
         </Tooltip>
       </div>
@@ -61,7 +61,7 @@ export const TopActions: React.FC<TopActionsProps> = ({
           {isDiagnosticRunning ? 'Диагностика...' : 'Диагностика'}
           <span className="ml-2 text-slate-400">?</span>
         </button>
-        <Tooltip content="Проверка: heartbeat, ORDERBOOK, задержка, селекторы" position="bottom">
+        <Tooltip text="Проверка: heartbeat, ORDERBOOK, задержка, селекторы">
           <div className="absolute inset-0 pointer-events-none" />
         </Tooltip>
       </div>
@@ -78,7 +78,7 @@ export const TopActions: React.FC<TopActionsProps> = ({
           {isTestDataRunning ? 'Тест...' : 'Тест данных'}
           <span className="ml-2 text-slate-400">?</span>
         </button>
-        <Tooltip content="Локальная проверка без API. На статус не влияет" position="bottom">
+        <Tooltip text="Локальная проверка без API. На статус не влияет">
           <div className="absolute inset-0 pointer-events-none" />
         </Tooltip>
       </div>

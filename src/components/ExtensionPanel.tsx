@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { bridgeSend, request } from '../bridge';
-import { Tooltip } from './Tooltip';
+import Tooltip from './SimpleTooltip';
 
 // Простая заглушка для chrome API
 declare global {
@@ -166,7 +166,7 @@ export const ExtensionPanel: React.FC<ExtensionPanelProps> = ({ isOpen, onClose 
         <div className="flex items-center justify-between p-4 border-b border-slate-600/50">
           <div className="flex items-center gap-2">
             <h2 className="text-lg font-semibold text-slate-200">Телеметрия расширения</h2>
-            <Tooltip content="Мост из страницы MEXC → терминал. Нужен для оценочной зоны" position="bottom">
+            <Tooltip text="Мост из страницы MEXC → терминал. Нужен для оценочной зоны">
               <span className="text-slate-400 text-sm cursor-help">?</span>
             </Tooltip>
           </div>

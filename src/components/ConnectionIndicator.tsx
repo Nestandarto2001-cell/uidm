@@ -63,9 +63,11 @@ export const ConnectionIndicator: React.FC<ConnectionIndicatorProps> = ({
 
       {/* OrderBook Fresh Status */}
       {(isStale || !obFresh) && (
-        <div className="px-2 py-1 bg-red-600/60 border border-red-600/50 text-xs text-white">
-          STALE
-        </div>
+        <Tooltip text="Данные устарели или не обновляются. Проверьте подключение к интернету и работу расширения. Если проблема сохраняется, перезагрузите страницу.">
+          <div className="px-2 py-1 bg-red-600/60 border border-red-600/50 text-xs text-white cursor-help hover:bg-red-600/80 transition-colors">
+            ⚠️ Устарели
+          </div>
+        </Tooltip>
       )}
 
       {/* API Status */}

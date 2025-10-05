@@ -37,7 +37,7 @@ export function useConnectionStatus() {
             
             // Проверяем API
             const probeResult = await probe();
-            if (probeResult.type === 'PROBE_OK') {
+            if ((probeResult as any).type === 'PROBE_OK') {
               apiState = 'connected';
             } else {
               apiState = 'disconnected';

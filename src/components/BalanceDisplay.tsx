@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Tooltip } from './Tooltip';
+import Tooltip from './SimpleTooltip';
 import { getMexcApiService, setMexcApiService, MexcBalance } from '../services/mexcApi';
 
 interface Balance {
@@ -29,7 +29,7 @@ export const BalanceDisplay: React.FC<BalanceDisplayProps> = ({
 
   const fetchBalances = async () => {
     if (!isApiConfigured || !apiKey || !apiSecret) {
-      setError('API не настроен');
+      setError('API не настроен - выберите профиль с API ключами');
       return;
     }
 
@@ -39,6 +39,16 @@ export const BalanceDisplay: React.FC<BalanceDisplayProps> = ({
     try {
       // Инициализируем API сервис
       const apiService = setMexcApiService(apiKey, apiSecret);
+      
+      // Сначала проверяем валидность API ключей
+      console.log('🔍 Проверяем валидность API ключей для профиля...');
+      const isValid = await apiService.validateApiKeys();
+      
+      if (!isValid) {
+        throw new Error('API ключи недействительны');
+      }
+      
+      console.log('✅ API ключи валидны, получаем баланс...');
       
       // Получаем баланс через API
       const mexcBalances = await apiService.getAccountBalance();
@@ -100,7 +110,7 @@ export const BalanceDisplay: React.FC<BalanceDisplayProps> = ({
       <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-lg font-semibold text-white">Баланс аккаунта</h3>
-          <Tooltip content="Настройте API ключи для отображения баланса">
+          <Tooltip text="Настройте API ключи для отображения баланса">
             <span className="text-gray-400 text-sm">❓</span>
           </Tooltip>
         </div>
@@ -116,7 +126,7 @@ export const BalanceDisplay: React.FC<BalanceDisplayProps> = ({
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-lg font-semibold text-white">Баланс аккаунта</h3>
         <div className="flex items-center space-x-2">
-          <Tooltip content="Обновить баланс">
+          <Tooltip text="Обновить баланс">
             <button
               onClick={fetchBalances}
               disabled={isLoading}
@@ -125,7 +135,7 @@ export const BalanceDisplay: React.FC<BalanceDisplayProps> = ({
               {isLoading ? '⏳' : '🔄'}
             </button>
           </Tooltip>
-          <Tooltip content="Общий баланс в USDT">
+          <Tooltip text="Общий баланс в USDT">
             <span className="text-green-400 font-medium text-sm">
               ≈ ${formatBalance(getTotalUSDTValue().toString())} USDT
             </span>
@@ -150,7 +160,7 @@ export const BalanceDisplay: React.FC<BalanceDisplayProps> = ({
             <div key={balance.asset} className="flex justify-between items-center py-2 px-3 bg-gray-700/50 rounded">
               <div className="flex items-center space-x-2">
                 <span className="text-white font-medium">{balance.asset}</span>
-                <Tooltip content={`Заблокировано: ${balance.locked} ${balance.asset}`}>
+                <Tooltip text={`Заблокировано: ${balance.locked} ${balance.asset}`}>
                   <span className="text-gray-400 text-xs">
                     {parseFloat(balance.locked) > 0 ? '🔒' : '✅'}
                   </span>

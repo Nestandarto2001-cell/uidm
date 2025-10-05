@@ -1,27 +1,29 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, lazy, Suspense } from "react";
+import { useRealOrderBook } from "./hooks/useRealOrderBook";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { useOrderBook } from "./hooks/useOrderBook";
-import { useRealOrderBook } from "./hooks/useRealOrderBook";
 import { MarketSummary } from "./components/MarketSummary";
 import { ProfessionalOrderBook } from "./components/ProfessionalOrderBook";
 import { OrderForm } from './components/OrderForm';
 import { MyOrders } from './components/MyOrders';
-import { ProfilesBar } from './components/ProfilesBar';
 import { FavoritesBar } from './components/FavoritesBar';
 import { BrowserConnection } from './components/BrowserConnectionNew';
 import { BalanceDisplay } from './components/BalanceDisplay';
-import { TopActions } from './components/TopActions';
+import { CurrentProfile } from './components/CurrentProfile';
 import { CollapsiblePanel } from './components/CollapsiblePanel';
 import { Header } from './components/Header';
 import { SymbolPickerModal } from './components/SymbolPickerModal';
-import { ExtensionPanel } from './components/ExtensionPanel';
 import { ProfileCreateModal } from './components/ProfileCreateModal';
+import { ExtensionPanel } from './components/ExtensionPanel';
 import TabNavigation from './components/TabNavigation';
-import AssessmentZone from './components/AssessmentZone';
-import ConnectionMethods from './components/ConnectionMethods';
-import HelpSection from './components/HelpSection';
+
+// Lazy load heavy components
+const AssessmentZone = lazy(() => import('./components/AssessmentZone'));
+const ConnectionPage = lazy(() => import('./components/ConnectionPage'));
 import { Order } from './types';
 import { CONFIG, setApiCredentials, hasApiCredentials } from './config';
+import { useProfilesStore } from './stores/profilesStore';
+import { setMexcApiService, clearMexcApiService } from './services/mexcApi';
 
 interface UserProfile {
   id: string;
@@ -35,13 +37,31 @@ interface UserProfile {
 
 function App() {
   const [symbol, setSymbol] = useState<string>('BTC_USDT');
-  const [currentProfile, setCurrentProfile] = useState<UserProfile | null>(null);
-  const [isApiConfigured, setIsApiConfigured] = useState<boolean>(hasApiCredentials());
   const [browserConnected, setBrowserConnected] = useState<boolean>(false);
   const [browserOrderBook, setBrowserOrderBook] = useState<any>(null);
   const [isSymbolPickerOpen, setIsSymbolPickerOpen] = useState(false);
   const [isExtensionPanelOpen, setIsExtensionPanelOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'trading' | 'assessment' | 'connection'>('trading');
+  
+  // Используем профили из store
+  const { items: profiles, activeId: activeProfileId } = useProfilesStore();
+  const currentProfile = profiles.find(p => p.id === activeProfileId);
+  
+  // Определяем API ключи из активного профиля
+  const apiKey = currentProfile?.apiKey || '';
+  const apiSecret = currentProfile?.apiSecret || '';
+  const isApiConfigured = !!(apiKey && apiSecret);
+  
+  // Обновляем API сервис при смене профиля
+  useEffect(() => {
+    if (apiKey && apiSecret) {
+      console.log('🔄 Обновляем API сервис для профиля:', currentProfile?.name);
+      setMexcApiService(apiKey, apiSecret);
+    } else {
+      console.log('🧹 Очищаем API сервис - нет ключей');
+      clearMexcApiService();
+    }
+  }, [apiKey, apiSecret, currentProfile?.name]);
   
   const { isConnected, orderBook, error, sendMessage } = useWebSocket(CONFIG.mexcWsUrl, symbol);
   
@@ -111,12 +131,6 @@ function App() {
     console.log('Order cancelled:', orderId);
   };
 
-  const handleApiCredentials = (key: string, secret: string) => {
-    setApiCredentials(key, secret);
-    setIsApiConfigured(true);
-    console.log('API credentials configured');
-  };
-
   const handleSymbolChange = (newSymbol: string) => {
     setSymbol(newSymbol);
     console.log('Symbol changed to:', newSymbol);
@@ -128,16 +142,6 @@ function App() {
 
   const handleBrowserOrderBook = (data: any) => {
     setBrowserOrderBook(data);
-  };
-
-  const handleProfileSelect = (profile: UserProfile | null) => {
-    setCurrentProfile(profile);
-    if (profile) {
-      // Обновляем конфигурацию API из профиля
-      if (profile.apiKey && profile.apiSecret) {
-        handleApiCredentials(profile.apiKey, profile.apiSecret);
-      }
-    }
   };
 
   // Слушаем сообщения от расширения браузера
@@ -219,8 +223,8 @@ function App() {
               </div>
             )}
 
-            {/* User Profiles */}
-            <ProfilesBar />
+            {/* Current Profile */}
+            <CurrentProfile />
 
             {/* Browser Connection */}
             <BrowserConnection
@@ -327,12 +331,13 @@ function App() {
             </div>
           </>
                     ) : activeTab === 'assessment' ? (
-                      <AssessmentZone />
+                      <Suspense fallback={<div className="flex items-center justify-center h-64 text-gray-400">Загрузка Assessment Zone...</div>}>
+                        <AssessmentZone />
+                      </Suspense>
                     ) : (
-                      <div className="space-y-6">
-                        <ConnectionMethods />
-                        <HelpSection />
-                      </div>
+                      <Suspense fallback={<div className="flex items-center justify-center h-64 text-gray-400">Загрузка настроек подключения...</div>}>
+                        <ConnectionPage />
+                      </Suspense>
                     )}
       </div>
       

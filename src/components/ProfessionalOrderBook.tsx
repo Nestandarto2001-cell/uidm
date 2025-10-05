@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { OrderBook as OrderBookType } from '../types';
-import { OrderBookHeader } from './OrderBookHeader';
+// import { OrderBookHeader } from './OrderBookHeader'; // Removed for optimization
 
 interface ProfessionalOrderBookProps {
   orderBook: OrderBookType | null;
@@ -131,7 +131,7 @@ export const ProfessionalOrderBook: React.FC<ProfessionalOrderBookProps> = ({
   return (
     <div className="bg-gray-900 rounded-lg border border-gray-700 overflow-hidden">
       {/* Header */}
-      <OrderBookHeader symbol={symbol} />
+      {/* <OrderBookHeader symbol={symbol} /> */} {/* Removed for optimization */}
       
       {/* Price Info */}
       <div className="bg-gray-800 px-4 py-2 border-b border-gray-700">

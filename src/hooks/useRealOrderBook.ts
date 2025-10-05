@@ -10,7 +10,13 @@ export const useRealOrderBook = (symbol: string, apiKey?: string, apiSecret?: st
 
   const fetchOrderBook = useCallback(async () => {
     if (!apiKey || !apiSecret) {
-      setError('API не настроен');
+      setError('API ключи не настроены. Перейдите в раздел "Подключение" для настройки.');
+      return;
+    }
+
+    // Проверяем валидность API ключей
+    if (apiKey.length < 10 || apiSecret.length < 10) {
+      setError('API ключи имеют неверный формат. Проверьте правильность ввода.');
       return;
     }
 
@@ -18,7 +24,18 @@ export const useRealOrderBook = (symbol: string, apiKey?: string, apiSecret?: st
     setError('');
 
     try {
+      console.log('[useRealOrderBook] Fetching order book for:', symbol, 'with API keys configured');
       const apiService = getMexcApiService() || setMexcApiService(apiKey, apiSecret);
+      
+      // Проверяем валидность API ключей
+      console.log('[useRealOrderBook] Validating API keys...');
+      const isValid = await apiService.validateApiKeys();
+      
+      if (!isValid) {
+        throw new Error('API ключи недействительны');
+      }
+      
+      console.log('[useRealOrderBook] API keys valid, fetching order book...');
       const mexcOrderBook = await apiService.getOrderBook(symbol);
       
       // Конвертируем в формат приложения
@@ -29,9 +46,11 @@ export const useRealOrderBook = (symbol: string, apiKey?: string, apiSecret?: st
 
       setOrderBook(orderBookData);
       setLastUpdate(new Date());
+      console.log('[useRealOrderBook] Successfully fetched order book');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Ошибка получения ордербука');
-      console.error('Order book fetch error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Ошибка получения ордербука';
+      setError(`${errorMessage}. Проверьте правильность API ключей и доступ к MEXC API.`);
+      console.error('[useRealOrderBook] Order book fetch error:', err);
     } finally {
       setIsLoading(false);
     }

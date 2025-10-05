@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TooltipButton } from './Tooltip';
+import { TooltipButton } from './SimpleTooltip';
 
 interface OrderFormProps {
   onOrder: (side: 'buy' | 'sell', type: 'limit' | 'market', price: number, amount: number) => void;
@@ -70,34 +70,14 @@ export const OrderForm: React.FC<OrderFormProps> = ({ onOrder, bestBid, bestAsk,
       {/* Order Type Toggle */}
       <div className="flex mb-4">
         <TooltipButton
-          tooltip={
-            <div>
-              <div className="font-semibold text-blue-400 mb-1">Лимитный ордер</div>
-              <div className="space-y-1">
-                <div>• Указываете конкретную цену</div>
-                <div>• Ордер исполняется только по указанной цене</div>
-                <div>• Более низкие комиссии</div>
-                <div>• Может не исполниться, если цена не достигнет</div>
-              </div>
-            </div>
-          }
+          text="Лимитный ордер: указываете конкретную цену, ордер исполняется только по указанной цене, более низкие комиссии"
           onClick={() => setOrderType('limit')}
           className={`px-4 py-2 rounded-l transition-colors ${orderType === 'limit' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
         >
           Limit
         </TooltipButton>
         <TooltipButton
-          tooltip={
-            <div>
-              <div className="font-semibold text-blue-400 mb-1">Рыночный ордер</div>
-              <div className="space-y-1">
-                <div>• Исполняется немедленно по рыночной цене</div>
-                <div>• Гарантированное исполнение</div>
-                <div>• Более высокие комиссии</div>
-                <div>• Цена может отличаться от ожидаемой</div>
-              </div>
-            </div>
-          }
+          text="Рыночный ордер: исполняется немедленно по рыночной цене, гарантированное исполнение, более высокие комиссии"
           onClick={() => setOrderType('market')}
           className={`px-4 py-2 rounded-r transition-colors ${orderType === 'market' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
         >
@@ -119,14 +99,14 @@ export const OrderForm: React.FC<OrderFormProps> = ({ onOrder, bestBid, bestAsk,
           />
           <div className="flex gap-2 mt-2">
             <TooltipButton
-              tooltip="Установить цену покупки (лучшая цена bid)"
+              text="Установить цену покупки (лучшая цена bid)"
               onClick={() => handlePriceClick(bestBid)}
               className="text-xs px-2 py-1 bg-gray-700 rounded hover:bg-gray-600 text-white transition-colors"
             >
               Bid: {formatPrice(bestBid)}
             </TooltipButton>
             <TooltipButton
-              tooltip="Установить цену продажи (лучшая цена ask)"
+              text="Установить цену продажи (лучшая цена ask)"
               onClick={() => handlePriceClick(bestAsk)}
               className="text-xs px-2 py-1 bg-gray-700 rounded hover:bg-gray-600 text-white transition-colors"
             >
@@ -149,21 +129,21 @@ export const OrderForm: React.FC<OrderFormProps> = ({ onOrder, bestBid, bestAsk,
         />
         <div className="flex gap-2 mt-2">
           <TooltipButton
-            tooltip="Использовать 25% от доступного баланса"
+            text="Использовать 25% от доступного баланса"
             onClick={() => handlePercentageClick(25)}
             className="text-xs px-2 py-1 bg-gray-700 rounded hover:bg-gray-600 text-white transition-colors"
           >
             25%
           </TooltipButton>
           <TooltipButton
-            tooltip="Использовать 50% от доступного баланса"
+            text="Использовать 50% от доступного баланса"
             onClick={() => handlePercentageClick(50)}
             className="text-xs px-2 py-1 bg-gray-700 rounded hover:bg-gray-600 text-white transition-colors"
           >
             50%
           </TooltipButton>
           <TooltipButton
-            tooltip="Использовать 100% от доступного баланса"
+            text="Использовать 100% от доступного баланса"
             onClick={() => handlePercentageClick(100)}
             className="text-xs px-2 py-1 bg-gray-700 rounded hover:bg-gray-600 text-white transition-colors"
           >
@@ -193,32 +173,14 @@ export const OrderForm: React.FC<OrderFormProps> = ({ onOrder, bestBid, bestAsk,
         ) : orderType === 'limit' ? (
           <>
             <TooltipButton
-              tooltip={
-                <div>
-                  <div className="font-semibold text-blue-400 mb-1">Лимитный ордер на покупку</div>
-                  <div className="space-y-1">
-                    <div>• Покупка по указанной цене</div>
-                    <div>• Исполняется только если цена достигнет</div>
-                    <div>• Более низкая комиссия</div>
-                  </div>
-                </div>
-              }
+              text="Лимитный ордер на покупку: покупка по указанной цене, исполняется только если цена достигнет, более низкая комиссия"
               onClick={handleBuyLimit}
               className="order-button buy-button"
             >
               Buy Limit
             </TooltipButton>
             <TooltipButton
-              tooltip={
-                <div>
-                  <div className="font-semibold text-blue-400 mb-1">Лимитный ордер на продажу</div>
-                  <div className="space-y-1">
-                    <div>• Продажа по указанной цене</div>
-                    <div>• Исполняется только если цена достигнет</div>
-                    <div>• Более низкая комиссия</div>
-                  </div>
-                </div>
-              }
+              text="Лимитный ордер на продажу: продажа по указанной цене, исполняется только если цена достигнет, более низкая комиссия"
               onClick={handleSellLimit}
               className="order-button sell-button"
             >
@@ -228,32 +190,14 @@ export const OrderForm: React.FC<OrderFormProps> = ({ onOrder, bestBid, bestAsk,
         ) : (
           <>
             <TooltipButton
-              tooltip={
-                <div>
-                  <div className="font-semibold text-blue-400 mb-1">Рыночный ордер на покупку</div>
-                  <div className="space-y-1">
-                    <div>• Немедленная покупка по рыночной цене</div>
-                    <div>• Гарантированное исполнение</div>
-                    <div>• Выше комиссия</div>
-                  </div>
-                </div>
-              }
+              text="Рыночный ордер на покупку: немедленная покупка по рыночной цене, гарантированное исполнение, выше комиссия"
               onClick={handleBuyMarket}
               className="order-button buy-button"
             >
               Buy Market
             </TooltipButton>
             <TooltipButton
-              tooltip={
-                <div>
-                  <div className="font-semibold text-blue-400 mb-1">Рыночный ордер на продажу</div>
-                  <div className="space-y-1">
-                    <div>• Немедленная продажа по рыночной цене</div>
-                    <div>• Гарантированное исполнение</div>
-                    <div>• Выше комиссия</div>
-                  </div>
-                </div>
-              }
+              text="Рыночный ордер на продажу: немедленная продажа по рыночной цене, гарантированное исполнение, выше комиссия"
               onClick={handleSellMarket}
               className="order-button sell-button"
             >

@@ -6,9 +6,9 @@
 import React, { useEffect, useState } from 'react';
 import AssessmentTable from './AssessmentTable';
 import AssessmentStatus from './AssessmentStatus';
-import ToastContainer from './ToastContainer';
+// import ToastContainer from './ToastContainer'; // Removed for optimization
 import { useAssessment } from '../hooks/useAssessment';
-import { useToast } from '../hooks/useToast';
+// import { useToast } from '../hooks/useToast'; // Removed for optimization
 import AssessmentBridge from '../bridge';
 
 function AssessmentZone() {
@@ -24,7 +24,12 @@ function AssessmentZone() {
 
   const [timezone, setTimezone] = useState<'UTC+8' | 'Local'>('Local');
 
-  const { toasts, showToast, removeToast } = useToast();
+  // const { toasts, showToast, removeToast } = useToast(); // Removed for optimization
+  
+  // Простая заглушка для showToast
+  const showToast = (options: any) => {
+    console.log('Toast:', options);
+  };
 
   // Listen for assessment updates to show notifications
   useEffect(() => {
@@ -88,7 +93,7 @@ function AssessmentZone() {
   return (
     <div className="space-y-6">
       {/* Toast Container */}
-      <ToastContainer toasts={toasts} onRemoveToast={removeToast} />
+      {/* <ToastContainer toasts={toasts} onRemoveToast={removeToast} /> */} {/* Removed for optimization */}
 
       {/* Status Bar */}
       <div className="bg-white rounded-lg shadow p-4">

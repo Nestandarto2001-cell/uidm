@@ -21,10 +21,30 @@ window.addEventListener('message', async (e) => {
   }
 
   // Пересылаем сообщение в service worker
-  chrome.runtime.sendMessage(msg, (response) => {
-    console.log('[Content Script] Response from worker:', response);
-    window.postMessage({ source: 'MEXC_TT', id: msg.id, ...response }, ORIGIN);
-  });
+  try {
+    chrome.runtime.sendMessage(msg, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error('[Content Script] Runtime error:', chrome.runtime.lastError);
+        window.postMessage({ 
+          source: 'MEXC_TT', 
+          id: msg.id, 
+          type: 'ERR', 
+          error: chrome.runtime.lastError.message 
+        }, ORIGIN);
+      } else {
+        console.log('[Content Script] Response from worker:', response);
+        window.postMessage({ source: 'MEXC_TT', id: msg.id, ...response }, ORIGIN);
+      }
+    });
+  } catch (error) {
+    console.error('[Content Script] Error sending message to worker:', error);
+    window.postMessage({ 
+      source: 'MEXC_TT', 
+      id: msg.id, 
+      type: 'ERR', 
+      error: error.message 
+    }, ORIGIN);
+  }
 });
 
 // Обработка сообщений от popup расширения
@@ -50,5 +70,19 @@ chrome.runtime.onMessage.addListener((msg) => {
 });
 
 // Сообщаем странице, что контент-скрипт жив
-window.postMessage({ source: 'MEXC_TT', type: 'EXT_READY' }, ORIGIN);
-console.log('[Content Script] Sent EXT_READY signal');
+function sendExtReady() {
+  window.postMessage({ source: 'MEXC_TT', type: 'EXT_READY' }, ORIGIN);
+  console.log('[Content Script] Sent EXT_READY signal');
+}
+
+// Отправляем EXT_READY сразу и повторно через небольшие интервалы
+sendExtReady();
+setTimeout(sendExtReady, 1000);
+setTimeout(sendExtReady, 3000);
+
+// Также отправляем при изменении видимости страницы
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    setTimeout(sendExtReady, 500);
+  }
+});

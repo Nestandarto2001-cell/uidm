@@ -12,18 +12,36 @@ let lastHeartbeat = Date.now();
 // Функция отправки heartbeat на все вкладки терминала
 async function sendHeartbeat() {
   try {
-    const tabs = await chrome.tabs.query({ url: ['http://localhost/*', 'http://127.0.0.1/*'] });
+    // Ищем все вкладки терминала
+    const tabs = await chrome.tabs.query({ 
+      url: ['http://localhost/*', 'http://127.0.0.1/*', 'http://localhost:3009/*', 'http://localhost:5173/*'] 
+    });
+    
+    console.log('[Service Worker] Found terminal tabs:', tabs.length);
+    
+    if (tabs.length === 0) {
+      console.log('[Service Worker] No terminal tabs found');
+      return;
+    }
     
     for (const tab of tabs) {
       try {
+        // Проверяем что вкладка активна
+        if (tab.status === 'loading') {
+          console.log('[Service Worker] Tab is loading, skipping:', tab.id);
+          continue;
+        }
+        
         await chrome.tabs.sendMessage(tab.id, {
           type: 'MEXC_HEARTBEAT',
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          tabId: tab.id
         });
         lastHeartbeat = Date.now();
-        console.log('[Service Worker] Heartbeat sent to tab:', tab.id);
+        console.log('[Service Worker] Heartbeat sent to tab:', tab.id, tab.url);
       } catch (error) {
-        console.log('[Service Worker] Failed to send heartbeat to tab:', tab.id, error);
+        console.log('[Service Worker] Failed to send heartbeat to tab:', tab.id, error.message);
+        // Не останавливаем цикл при ошибке одной вкладки
       }
     }
   } catch (error) {

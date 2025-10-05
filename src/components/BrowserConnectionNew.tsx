@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TooltipButton } from './Tooltip';
+import { TooltipButton } from './SimpleTooltip';
 import { TopActions } from './TopActions';
 import { CollapsiblePanel } from './CollapsiblePanel';
 import { ExtensionPanel } from './ExtensionPanel';

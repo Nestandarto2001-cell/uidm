@@ -21,9 +21,13 @@ const DiagnosticModal: React.FC<DiagnosticModalProps> = ({ isOpen, onClose }) =>
   const [rows, setRows] = useState<DiagnosticRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [heartbeatStatus, setHeartbeatStatus] = useState<'waiting' | 'connected' | 'disconnected'>('waiting');
+  const [diagnosticStatus, setDiagnosticStatus] = useState<'none' | 'running' | 'success' | 'error'>('none');
+  const [showPulse, setShowPulse] = useState(false);
 
   const runDiagnostic = async () => {
     setIsLoading(true);
+    setDiagnosticStatus('running');
+    setShowPulse(true);
     const r: DiagnosticRow[] = [];
 
     try {
@@ -51,10 +55,14 @@ const DiagnosticModal: React.FC<DiagnosticModalProps> = ({ isOpen, onClose }) =>
       // Доступ к MEXC API
       if (bridgeReady) {
         const p = await probe();
-        if (p.type === 'PROBE_OK') {
-          r.push({ k: 'Доступ к MEXC API', v: 'Успешно', s: 'ok' });
+        if (typeof p === 'object' && p !== null && 'type' in p) {
+          if ((p as any).type === 'PROBE_OK') {
+            r.push({ k: 'Доступ к MEXC API', v: 'Успешно', s: 'ok' });
+          } else {
+            r.push({ k: 'Доступ к MEXC API', v: String((p as any).error || 'Ошибка'), s: 'err' });
+          }
         } else {
-          r.push({ k: 'Доступ к MEXC API', v: String(p.error || 'Ошибка'), s: 'err' });
+          r.push({ k: 'Доступ к MEXC API', v: 'Неизвестный ответ', s: 'err' });
         }
       }
 
@@ -72,6 +80,18 @@ const DiagnosticModal: React.FC<DiagnosticModalProps> = ({ isOpen, onClose }) =>
       r.push({ k: 'Время диагностики', v: new Date().toLocaleString('ru-RU'), s: 'ok' });
 
       setRows(r);
+      
+      // Определяем общий статус диагностики
+      const hasErrors = r.some(row => row.s === 'err');
+      const hasWarnings = r.some(row => row.s === 'warn');
+      
+      if (hasErrors) {
+        setDiagnosticStatus('error');
+      } else if (hasWarnings) {
+        setDiagnosticStatus('error'); // Считаем предупреждения ошибками
+      } else {
+        setDiagnosticStatus('success');
+      }
 
     } catch (error) {
       console.error('[Diagnostic] Error:', error);
@@ -81,8 +101,15 @@ const DiagnosticModal: React.FC<DiagnosticModalProps> = ({ isOpen, onClose }) =>
         s: 'err' 
       });
       setRows(r);
+      setDiagnosticStatus('error');
     } finally {
       setIsLoading(false);
+      
+      // Запускаем эффект моргания
+      setTimeout(() => {
+        setShowPulse(true);
+        setTimeout(() => setShowPulse(false), 300);
+      }, 100);
     }
   };
 
@@ -166,13 +193,61 @@ const DiagnosticModal: React.FC<DiagnosticModalProps> = ({ isOpen, onClose }) =>
           <button
             onClick={runDiagnostic}
             disabled={isLoading}
-            className="flex-1 bg-white hover:bg-gray-100 disabled:bg-gray-300 disabled:opacity-50 text-black px-4 py-2 rounded-md transition-colors font-medium"
+            className={`flex-1 px-4 py-2 rounded-md transition-all duration-300 font-medium ${
+              diagnosticStatus === 'running' 
+                ? 'bg-white border-2 border-white' 
+                : diagnosticStatus === 'success' && showPulse
+                ? 'bg-green-500 text-white border-2 border-green-500'
+                : diagnosticStatus === 'error' && showPulse
+                ? 'bg-red-500 text-white border-2 border-red-500'
+                : 'bg-white hover:bg-gray-100 text-black border-2 border-transparent'
+            } ${isLoading ? 'opacity-50' : ''}`}
           >
             {isLoading ? 'Проверяем...' : 'Повторить диагностику'}
           </button>
           
           <button
-            onClick={() => window.open('chrome://extensions/', '_blank')}
+            onClick={() => {
+              // Создаем модальное окно с инструкциями
+              const extensionsModal = document.createElement('div');
+              extensionsModal.className = 'fixed inset-0 z-50 grid place-items-center bg-black/80';
+              extensionsModal.innerHTML = `
+                <div class="w-[500px] rounded-lg p-6 bg-black border border-gray-800">
+                  <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-white">Управление расширениями</h3>
+                    <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-white text-xl">×</button>
+                  </div>
+                  
+                  <div class="space-y-4 text-gray-300">
+                    <div>
+                      <h4 class="text-white font-medium mb-2">Chrome:</h4>
+                      <p class="text-sm">1. Скопируйте адрес: <code class="bg-gray-800 px-2 py-1 rounded">chrome://extensions/</code></p>
+                      <p class="text-sm">2. Вставьте в адресную строку и нажмите Enter</p>
+                      <button onclick="navigator.clipboard.writeText('chrome://extensions/').then(() => alert('Скопировано!'))" class="mt-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm">Копировать</button>
+                    </div>
+                    
+                    <div>
+                      <h4 class="text-white font-medium mb-2">Edge:</h4>
+                      <p class="text-sm">1. Скопируйте адрес: <code class="bg-gray-800 px-2 py-1 rounded">edge://extensions/</code></p>
+                      <p class="text-sm">2. Вставьте в адресную строку и нажмите Enter</p>
+                      <button onclick="navigator.clipboard.writeText('edge://extensions/').then(() => alert('Скопировано!'))" class="mt-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm">Копировать</button>
+                    </div>
+                    
+                    <div class="p-3 bg-yellow-400/10 border border-yellow-400/20 rounded">
+                      <p class="text-yellow-400 text-sm">
+                        <strong>Важно:</strong> Убедитесь что расширение "МексоЁБ" включено и имеет доступ к сайту терминала.
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div class="mt-6 flex justify-end">
+                    <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 bg-white hover:bg-gray-100 text-black rounded-md transition-colors font-medium">Закрыть</button>
+                  </div>
+                </div>
+              `;
+              
+              document.body.appendChild(extensionsModal);
+            }}
             className="flex-1 bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-md transition-colors font-medium"
           >
             Расширения
