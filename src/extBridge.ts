@@ -1,122 +1,180 @@
 /**
- * Extension Bridge - Мост между страницей и расширением
+ * Extension Bridge - мост между страницей и расширением
+ * Обеспечивает связь с background.js для API запросов
  */
 
-type Msg = { id?: string; source: 'MEXC_TT'; type: string; [k: string]: any };
+interface ExtMessage {
+  source: 'MEXC_TT';
+  type: string;
+  payload?: any;
+  id?: string;
+}
 
-let ready = false;
-const waiters = new Map<string, (v: any) => void>();
+interface ExtResponse {
+  type: string;
+  payload?: any;
+  error?: string;
+  id?: string;
+}
 
-// Обработка сообщений от content script
-window.addEventListener('message', (e) => {
-  const m = e.data;
-  if (!m || m.source !== 'MEXC_TT') return;
-  
-  console.log('[ExtBridge] Received message:', m);
-  
-  if (m.type === 'EXT_READY') { 
-    ready = true; 
-    console.log('[ExtBridge] Extension ready');
-  }
-  if (m.type === 'PONG') { 
-    console.log('[ExtBridge] Pong received');
-  }
-  if (m.id && waiters.has(m.id)) { 
-    const waiter = waiters.get(m.id)!;
-    waiter(m); 
-    waiters.delete(m.id); 
-  }
-});
+class ExtensionBridge {
+  private messageId = 0;
+  private pendingMessages = new Map<string, { resolve: (value: any) => void; reject: (error: any) => void }>();
 
-export function extIsReady(): boolean { 
+  constructor() {
+    // Слушаем сообщения от расширения
+    window.addEventListener('message', this.handleMessage.bind(this));
+  }
+
+  private handleMessage(event: MessageEvent) {
+    if (event.data?.source !== 'MEXC_TT') return;
+
+    const response = event.data as ExtResponse;
+    
+    if (response.id && this.pendingMessages.has(response.id)) {
+      const { resolve, reject } = this.pendingMessages.get(response.id)!;
+      this.pendingMessages.delete(response.id);
+      
+      if (response.error) {
+        reject(new Error(response.error));
+      } else {
+        resolve(response.payload);
+      }
+    }
+  }
+
+  private sendMessage(type: string, payload?: any): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const id = `msg_${++this.messageId}_${Date.now()}`;
+      
+      this.pendingMessages.set(id, { resolve, reject });
+      
+      const message: ExtMessage = {
+        source: 'MEXC_TT',
+        type,
+        payload,
+        id
+      };
+
+      window.postMessage(message, '*');
+      
+      // Таймаут для запроса
+      setTimeout(() => {
+        if (this.pendingMessages.has(id)) {
+          this.pendingMessages.delete(id);
+          reject(new Error('Request timeout'));
+        }
+      }, 10000);
+    });
+  }
+
+  // Проверка готовности расширения
+  async ping(): Promise<boolean> {
+    try {
+      const response = await this.sendMessage('PING');
+      return response === 'PONG';
+    } catch (error) {
+      console.error('[ExtBridge] Ping failed:', error);
+      return false;
+    }
+  }
+
+  // Проверка доступности MEXC API
+  async probe(): Promise<any> {
+    try {
+      return await this.sendMessage('PROBE');
+    } catch (error) {
+      console.error('[ExtBridge] Probe failed:', error);
+      return { type: 'PROBE_ERROR', error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  // Получение данных ордербука
+  async getOrderBook(symbol: string): Promise<any> {
+    try {
+      return await this.sendMessage('GET_ORDERBOOK', { symbol });
+    } catch (error) {
+      console.error('[ExtBridge] GetOrderBook failed:', error);
+      throw error;
+    }
+  }
+
+  // Получение баланса аккаунта
+  async getBalance(): Promise<any> {
+    try {
+      return await this.sendMessage('GET_BALANCE');
+    } catch (error) {
+      console.error('[ExtBridge] GetBalance failed:', error);
+      throw error;
+    }
+  }
+
+  // Получение списка символов
+  async getSymbols(): Promise<any> {
+    try {
+      return await this.sendMessage('GET_SYMBOLS');
+    } catch (error) {
+      console.error('[ExtBridge] GetSymbols failed:', error);
+      throw error;
+    }
+  }
+
+  // Получение тикера
+  async getTicker(symbol: string): Promise<any> {
+    try {
+      return await this.sendMessage('GET_TICKER', { symbol });
+    } catch (error) {
+      console.error('[ExtBridge] GetTicker failed:', error);
+      throw error;
+    }
+  }
+
+  // Размещение ордера
+  async placeOrder(orderData: any): Promise<any> {
+    try {
+      return await this.sendMessage('PLACE_ORDER', orderData);
+    } catch (error) {
+      console.error('[ExtBridge] PlaceOrder failed:', error);
+      throw error;
+    }
+  }
+
+  // Отмена ордера
+  async cancelOrder(orderId: string): Promise<any> {
+    try {
+      return await this.sendMessage('CANCEL_ORDER', { orderId });
+    } catch (error) {
+      console.error('[ExtBridge] CancelOrder failed:', error);
+      throw error;
+    }
+  }
+}
+
+// Создаем глобальный экземпляр
+const extBridge = new ExtensionBridge();
+
+// Экспортируем функции
+export const ping = () => extBridge.ping();
+export const probe = () => extBridge.probe();
+export const getOrderBook = (symbol: string) => extBridge.getOrderBook(symbol);
+export const getBalance = () => extBridge.getBalance();
+export const getSymbols = () => extBridge.getSymbols();
+export const getTicker = (symbol: string) => extBridge.getTicker(symbol);
+export const placeOrder = (orderData: any) => extBridge.placeOrder(orderData);
+export const cancelOrder = (orderId: string) => extBridge.cancelOrder(orderId);
+
+// Проверка готовности расширения
+export function extIsReady(): boolean {
   // Проверяем несколько способов определения готовности расширения
   const hasContentScript = document.querySelector('script[src*="content.js"]') !== null;
-  const hasExtensionAPI = typeof window !== 'undefined' && 
-    typeof (window as any).chrome !== 'undefined' && 
+  const hasExtensionAPI = typeof window !== 'undefined' &&
+    typeof (window as any).chrome !== 'undefined' &&
     (window as any).chrome.runtime;
   
-  console.log('[ExtBridge] Extension status check:', {
-    ready,
-    hasContentScript,
-    hasExtensionAPI,
-    userAgent: navigator.userAgent.includes('Chrome') || navigator.userAgent.includes('Edge')
-  });
+  // Проверяем наличие сообщений от расширения
+  const hasExtensionMessages = document.querySelector('meta[name="mexc-tt-extension"]') !== null;
   
-  return ready || hasExtensionAPI;
+  return hasContentScript || hasExtensionAPI || hasExtensionMessages;
 }
 
-function ask(type: string, payload: any = {}) {
-  const id = Math.random().toString(36).slice(2);
-  const msg: Msg = { source: 'MEXC_TT', type, id, ...payload };
-  
-  console.log('[ExtBridge] Sending message:', msg);
-  
-  return new Promise((res) => {
-    waiters.set(id, res);
-    window.postMessage(msg, window.origin);
-    setTimeout(() => {
-      if (waiters.has(id)) {
-        waiters.delete(id);
-        res({ type: 'ERR', error: 'timeout' });
-      }
-    }, 5000);
-  });
-}
-
-// API функции
-export async function probe() {
-  return ask('PROBE');
-}
-
-export async function fetchBook(symbol: string) {
-  return ask('FETCH_BOOK', { symbol });
-}
-
-export async function fetchTicker(symbol: string) {
-  return ask('FETCH_TICKER', { symbol });
-}
-
-export async function fetch24hrTicker(symbol: string) {
-  return ask('FETCH_24HR_TICKER', { symbol });
-}
-
-// Assessment Zone функции
-export async function startAssessment() {
-  return ask('ASSESS_START');
-}
-
-export async function stopAssessment() {
-  return ask('ASSESS_STOP');
-}
-
-export async function refreshAssessment() {
-  return ask('ASSESS_REFRESH');
-}
-
-export async function getAssessmentStatus() {
-  return ask('ASSESS_STATUS_REQUEST');
-}
-
-// Ping функция для проверки связи
-export async function ping(): Promise<boolean> {
-  try {
-    console.log('[ExtBridge] Sending ping...');
-    const response = await ask('PING');
-    console.log('[ExtBridge] Ping response:', response);
-    
-    if (response && typeof response === 'object' && (response as any).type === 'PONG') {
-      return true;
-    }
-    
-    // Fallback: если нет PONG, но есть ответ от расширения
-    if (response && typeof response === 'object') {
-      console.log('[ExtBridge] Got response but not PONG, considering as connected');
-      return true;
-    }
-    
-    return false;
-  } catch (error) {
-    console.error('[ExtBridge] Ping failed:', error);
-    return false;
-  }
-}
+export default extBridge;
