@@ -1,0 +1,42 @@
+*** Begin Patch
+*** Update File: browser-extension/manifest.json
+@@
+ {
+   "manifest_version": 3,
+   ...
+   "host_permissions": [
+    "+    \"https://*.mexc.com/*\",
+    "+    \"https://api.mexc.com/*\",
+    "+    \"https://contract.mexc.com/*\",
+    "+    \"https://futures.mexc.com/*\",
+    "+    \"https://YOUR-TERMINAL-DOMAIN/*\"
+   ],
+    "content_scripts": [
+     {
+       "matches": [
+         "https://*.mexc.com/*",
+         "https://YOUR-TERMINAL-DOMAIN/*"
+       ],
+       "js": ["content.js"],
+       "run_at": "document_start",
+       "all_frames": true
+     }
+   ],
+   "externally_connectable": {
+     "matches": ["https://YOUR-TERMINAL-DOMAIN/*"]
+   },
+   "background": {
+     "service_worker": "background.js",
+     "type": "module"
+   },
+   "declarative_net_request": {
+     "rule_resources": [
+       {
+         "id": "cors",
+         "enabled": true,
+         "path": "rules/cors.json"
+       }
+     ]
+   },
+   "default_locale": "ru"
+ }
