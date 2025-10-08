@@ -1,199 +1,194 @@
 /**
- * Service Worker - Background Script
- * Все сетевые запросы к MEXC идут отсюда
+ * Background Service Worker для MEXC Trading Terminal
+ * Обрабатывает все сетевые запросы к MEXC API
  */
 
-console.log('[Service Worker] Started');
+console.log('[Background] MEXC Trading Terminal background script loaded');
 
-// Heartbeat для поддержания связи со страницей
-let heartbeatInterval = null;
-let lastHeartbeat = Date.now();
+// Обработчик сообщений от content script
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log('[Background] Received message:', message);
+  
+  if (message.source === 'MEXC_TT') {
+    handleExtensionMessage(message, sender, sendResponse);
+    return true; // Указываем, что ответ будет асинхронным
+  }
+});
 
-// Функция отправки heartbeat на все вкладки терминала
-async function sendHeartbeat() {
+// Обработка сообщений от расширения
+async function handleExtensionMessage(message, sender, sendResponse) {
   try {
-    // Ищем все вкладки терминала
-    const tabs = await chrome.tabs.query({ 
-      url: ['http://localhost/*', 'http://127.0.0.1/*', 'http://localhost:3009/*', 'http://localhost:5173/*'] 
-    });
+    let response;
     
-    console.log('[Service Worker] Found terminal tabs:', tabs.length);
-    
-    if (tabs.length === 0) {
-      console.log('[Service Worker] No terminal tabs found');
-      return;
+    switch (message.type) {
+      case 'PING':
+        response = 'PONG';
+        break;
+        
+      case 'PROBE':
+        response = await probeMEXCAPI();
+        break;
+        
+      case 'GET_ORDERBOOK':
+        response = await getOrderBook(message.payload.symbol);
+        break;
+        
+      case 'GET_BALANCE':
+        response = await getAccountBalance();
+        break;
+        
+      case 'GET_SYMBOLS':
+        response = await getSymbols();
+        break;
+        
+      case 'GET_TICKER':
+        response = await getTicker(message.payload.symbol);
+        break;
+        
+      case 'PLACE_ORDER':
+        response = await placeOrder(message.payload);
+        break;
+        
+      case 'CANCEL_ORDER':
+        response = await cancelOrder(message.payload.orderId);
+        break;
+        
+      default:
+        response = { error: 'Unknown message type' };
     }
     
-    for (const tab of tabs) {
-      try {
-        // Проверяем что вкладка активна
-        if (tab.status === 'loading') {
-          console.log('[Service Worker] Tab is loading, skipping:', tab.id);
-          continue;
-        }
-        
-        await chrome.tabs.sendMessage(tab.id, {
-          type: 'MEXC_HEARTBEAT',
-          timestamp: Date.now(),
-          tabId: tab.id
-        });
-        lastHeartbeat = Date.now();
-        console.log('[Service Worker] Heartbeat sent to tab:', tab.id, tab.url);
-      } catch (error) {
-        console.log('[Service Worker] Failed to send heartbeat to tab:', tab.id, error.message);
-        // Не останавливаем цикл при ошибке одной вкладки
-      }
+    // Отправляем ответ обратно
+    sendResponse({
+      source: 'MEXC_TT',
+      type: message.type + '_RESPONSE',
+      payload: response,
+      id: message.id
+    });
+    
+  } catch (error) {
+    console.error('[Background] Error handling message:', error);
+    sendResponse({
+      source: 'MEXC_TT',
+      type: message.type + '_ERROR',
+      error: error.message,
+      id: message.id
+    });
+  }
+}
+
+// Проверка доступности MEXC API
+async function probeMEXCAPI() {
+  try {
+    const response = await fetch('https://api.mexc.com/api/v3/time');
+    if (response.ok) {
+      const data = await response.json();
+      return { type: 'PROBE_OK', serverTime: data.serverTime };
+    } else {
+      return { type: 'PROBE_ERROR', error: `HTTP ${response.status}` };
     }
   } catch (error) {
-    console.error('[Service Worker] Error sending heartbeat:', error);
+    return { type: 'PROBE_ERROR', error: error.message };
   }
 }
 
-// Запускаем heartbeat каждые 5 секунд
-function startHeartbeat() {
-  if (heartbeatInterval) {
-    clearInterval(heartbeatInterval);
-  }
-  
-  heartbeatInterval = setInterval(sendHeartbeat, 5000);
-  console.log('[Service Worker] Heartbeat started');
-}
-
-// Останавливаем heartbeat
-function stopHeartbeat() {
-  if (heartbeatInterval) {
-    clearInterval(heartbeatInterval);
-    heartbeatInterval = null;
-    console.log('[Service Worker] Heartbeat stopped');
-  }
-}
-
-// API функции для работы с MEXC
-const api = {
-  async probe() {
-    console.log('[Service Worker] Probing MEXC API...');
-    const r = await fetch('https://api.mexc.com/api/v3/time', { 
-      cache: 'no-store',
-      method: 'GET'
-    });
-    if (!r.ok) throw new Error('MEXC time failed ' + r.status);
-    const j = await r.json();
-    console.log('[Service Worker] MEXC API probe successful:', j);
-    return { ok: true, data: j };
-  },
-
-  async getBook(symbol) {
-    console.log('[Service Worker] Fetching order book for:', symbol);
-    const url = `https://api.mexc.com/api/v3/depth?symbol=${symbol}&limit=50`;
-    const r = await fetch(url, { cache: 'no-store' });
-    if (!r.ok) throw new Error('depth fail ' + r.status);
-    const data = await r.json();
-    console.log('[Service Worker] Order book fetched:', data);
-    return data;
-  },
-
-  async getTicker(symbol) {
-    console.log('[Service Worker] Fetching ticker for:', symbol);
-    const url = `https://api.mexc.com/api/v3/ticker/price?symbol=${symbol}`;
-    const r = await fetch(url, { cache: 'no-store' });
-    if (!r.ok) throw new Error('ticker fail ' + r.status);
-    const data = await r.json();
-    console.log('[Service Worker] Ticker fetched:', data);
-    return data;
-  },
-
-  async get24hrTicker(symbol) {
-    console.log('[Service Worker] Fetching 24hr ticker for:', symbol);
-    const url = `https://api.mexc.com/api/v3/ticker/24hr?symbol=${symbol}`;
-    const r = await fetch(url, { cache: 'no-store' });
-    if (!r.ok) throw new Error('24hr ticker fail ' + r.status);
-    const data = await r.json();
-    console.log('[Service Worker] 24hr ticker fetched:', data);
-    return data;
-  }
-};
-
-// Обработка сообщений от content script
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  console.log('[Service Worker] Received message:', msg);
-  
-  (async () => {
-    try {
-      if (msg.type === 'PROBE') {
-        const res = await api.probe();
-        sendResponse({ type: 'PROBE_OK', res });
-      } else if (msg.type === 'FETCH_BOOK') {
-        const res = await api.getBook(msg.symbol);
-        sendResponse({ type: 'BOOK_OK', res });
-      } else if (msg.type === 'FETCH_TICKER') {
-        const res = await api.getTicker(msg.symbol);
-        sendResponse({ type: 'TICKER_OK', res });
-      } else if (msg.type === 'FETCH_24HR_TICKER') {
-        const res = await api.get24hrTicker(msg.symbol);
-        sendResponse({ type: 'TICKER_24HR_OK', res });
-      } else if (msg.type === 'ASSESS_START') {
-        // Start assessment monitoring
-        await chrome.alarms.create('assessmentCheck', {
-          delayInMinutes: 1,
-          periodInMinutes: 10
-        });
-        sendResponse({ type: 'ASSESS_START_OK' });
-      } else if (msg.type === 'ASSESS_STOP') {
-        // Stop assessment monitoring
-        await chrome.alarms.clear('assessmentCheck');
-        sendResponse({ type: 'ASSESS_STOP_OK' });
-      } else if (msg.type === 'ASSESS_REFRESH') {
-        // Trigger assessment check
-        await chrome.alarms.create('assessmentCheckNow', {
-          delayInMinutes: 0
-        });
-        sendResponse({ type: 'ASSESS_REFRESH_OK' });
-      } else if (msg.type === 'ASSESS_STATUS_REQUEST') {
-        // Get assessment status
-        const alarms = await chrome.alarms.getAll();
-        const assessmentAlarm = alarms.find(alarm => alarm.name === 'assessmentCheck');
-        const status = {
-          isRunning: !!assessmentAlarm,
-          lastCheckTime: new Date().toISOString(),
-          checkInterval: 10
-        };
-        sendResponse({ type: 'ASSESS_STATUS_OK', status });
-      } else if (msg.type === 'PING') {
-        // Запускаем heartbeat при первом ping
-        if (!heartbeatInterval) {
-          startHeartbeat();
-        }
-        sendResponse({ type: 'PONG', timestamp: Date.now() });
-      } else {
-        sendResponse({ type: 'ERR', error: 'unknown_msg' });
-      }
-    } catch (e) {
-      console.error('[Service Worker] Error:', e);
-      sendResponse({ type: 'ERR', error: String(e) });
+// Получение ордербука
+async function getOrderBook(symbol) {
+  try {
+    const response = await fetch(`https://api.mexc.com/api/v3/depth?symbol=${symbol}&limit=100`);
+    if (response.ok) {
+      return await response.json();
+    } else {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-  })();
-  
-  return true; // async
-});
-
-// Обработка алармов для Assessment Zone
-chrome.alarms.onAlarm.addListener(async (alarm) => {
-  if (alarm.name === 'assessmentCheck' || alarm.name === 'assessmentCheckNow') {
-    console.log('[Service Worker] Assessment check triggered');
-    // Здесь будет логика проверки Assessment Zone
-    // Пока просто логируем
-    console.log('[Service Worker] Assessment Zone check completed');
+  } catch (error) {
+    throw new Error(`Failed to get order book: ${error.message}`);
   }
-});
+}
 
-// Обработка установки расширения
-chrome.runtime.onInstalled.addListener(() => {
-  console.log('[Service Worker] Extension installed');
-  // Запускаем heartbeat сразу после установки
-  setTimeout(startHeartbeat, 1000);
-});
+// Получение баланса аккаунта
+async function getAccountBalance() {
+  try {
+    // Возвращаем моковые данные для демонстрации
+    return {
+      balances: [
+        { asset: 'USDT', free: '1000.00', locked: '0.00' },
+        { asset: 'BTC', free: '0.05', locked: '0.00' }
+      ]
+    };
+  } catch (error) {
+    throw new Error(`Failed to get balance: ${error.message}`);
+  }
+}
 
-// Запускаем heartbeat при старте service worker
-startHeartbeat();
+// Получение списка символов
+async function getSymbols() {
+  try {
+    const response = await fetch('https://api.mexc.com/api/v3/exchangeInfo');
+    if (response.ok) {
+      const data = await response.json();
+      return data.symbols;
+    } else {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+  } catch (error) {
+    throw new Error(`Failed to get symbols: ${error.message}`);
+  }
+}
 
-console.log('[Service Worker] Ready');
+// Получение тикера
+async function getTicker(symbol) {
+  try {
+    const response = await fetch(`https://api.mexc.com/api/v3/ticker/24hr?symbol=${symbol}`);
+    if (response.ok) {
+      return await response.json();
+    } else {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+  } catch (error) {
+    throw new Error(`Failed to get ticker: ${error.message}`);
+  }
+}
+
+// Размещение ордера
+async function placeOrder(orderData) {
+  try {
+    // Возвращаем моковый ответ
+    return {
+      orderId: Date.now().toString(),
+      symbol: orderData.symbol,
+      side: orderData.side,
+      type: orderData.type,
+      status: 'pending'
+    };
+  } catch (error) {
+    throw new Error(`Failed to place order: ${error.message}`);
+  }
+}
+
+// Отмена ордера
+async function cancelOrder(orderId) {
+  try {
+    return { success: true };
+  } catch (error) {
+    throw new Error(`Failed to cancel order: ${error.message}`);
+  }
+}
+
+// Отправка heartbeat сообщений
+setInterval(() => {
+  chrome.tabs.query({}, (tabs) => {
+    tabs.forEach(tab => {
+      if (tab.url && tab.url.includes('localhost:3001')) {
+        chrome.tabs.sendMessage(tab.id, {
+          source: 'MEXC_TT',
+          type: 'MEXC_HEARTBEAT',
+          timestamp: Date.now()
+        }).catch(() => {
+          // Игнорируем ошибки для вкладок без content script
+        });
+      }
+    });
+  });
+}, 5000);
+
+console.log('[Background] MEXC Trading Terminal background script loaded');

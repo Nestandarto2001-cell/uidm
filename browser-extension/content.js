@@ -1,88 +1,51 @@
 /**
- * Content Script - Bridge между страницей и Service Worker
- * Страница ↔ Контент-скрипт ↔ Воркер
+ * Content Script для MEXC Trading Terminal
+ * Мост между страницей и background script
  */
 
-const ORIGIN = location.origin;
+console.log('[Content] MEXC Trading Terminal content script loaded');
 
-console.log('[Content Script] Initialized on:', location.href);
-
-// От страницы к воркеру
-window.addEventListener('message', async (e) => {
-  const msg = e.data;
-  if (!msg || msg.source !== 'MEXC_TT') return;
-
-  console.log('[Content Script] Received message from page:', msg);
-
-  if (msg.type === 'PING') {
-    window.postMessage({ source: 'MEXC_TT', type: 'PONG' }, ORIGIN);
-    console.log('[Content Script] Sent PONG response');
-    return;
-  }
-
-  // Пересылаем сообщение в service worker
-  try {
-    chrome.runtime.sendMessage(msg, (response) => {
-      if (chrome.runtime.lastError) {
-        console.error('[Content Script] Runtime error:', chrome.runtime.lastError);
-        window.postMessage({ 
-          source: 'MEXC_TT', 
-          id: msg.id, 
-          type: 'ERR', 
-          error: chrome.runtime.lastError.message 
-        }, ORIGIN);
-      } else {
-        console.log('[Content Script] Response from worker:', response);
-        window.postMessage({ source: 'MEXC_TT', id: msg.id, ...response }, ORIGIN);
-      }
-    });
-  } catch (error) {
-    console.error('[Content Script] Error sending message to worker:', error);
-    window.postMessage({ 
-      source: 'MEXC_TT', 
-      id: msg.id, 
-      type: 'ERR', 
-      error: error.message 
-    }, ORIGIN);
-  }
-});
-
-// Обработка сообщений от popup расширения
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log('[Content Script] Received message from popup:', message);
-  
-  if (message.type === 'OPEN_DIAGNOSTIC') {
-    // Отправляем сообщение на страницу для открытия диагностики
-    window.postMessage({ 
-      source: 'MEXC_TT', 
-      type: 'OPEN_DIAGNOSTIC_MODAL',
-      fromExtension: true 
-    }, ORIGIN);
+// Слушаем сообщения от страницы
+window.addEventListener('message', (event) => {
+  if (event.data?.source === 'MEXC_TT') {
+    console.log('[Content] Received message from page:', event.data);
     
-    sendResponse({ success: true });
+    // Пересылаем сообщение в background script
+    chrome.runtime.sendMessage(event.data, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error('[Content] Error sending message to background:', chrome.runtime.lastError);
+        return;
+      }
+      
+      console.log('[Content] Received response from background:', response);
+      
+      // Отправляем ответ обратно на страницу
+      window.postMessage(response, '*');
+    });
   }
 });
 
-// От воркера к странице (например, пуш-события)
-chrome.runtime.onMessage.addListener((msg) => {
-  console.log('[Content Script] Received message from worker:', msg);
-  window.postMessage({ source: 'MEXC_TT', ...msg }, ORIGIN);
-});
-
-// Сообщаем странице, что контент-скрипт жив
-function sendExtReady() {
-  window.postMessage({ source: 'MEXC_TT', type: 'EXT_READY' }, ORIGIN);
-  console.log('[Content Script] Sent EXT_READY signal');
-}
-
-// Отправляем EXT_READY сразу и повторно через небольшие интервалы
-sendExtReady();
-setTimeout(sendExtReady, 1000);
-setTimeout(sendExtReady, 3000);
-
-// Также отправляем при изменении видимости страницы
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) {
-    setTimeout(sendExtReady, 500);
+// Слушаем сообщения от background script
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.source === 'MEXC_TT') {
+    console.log('[Content] Received message from background:', message);
+    
+    // Пересылаем сообщение на страницу
+    window.postMessage(message, '*');
   }
 });
+
+// Добавляем мета-тег для определения наличия расширения
+const meta = document.createElement('meta');
+meta.name = 'mexc-tt-extension';
+meta.content = 'loaded';
+document.head.appendChild(meta);
+
+// Отправляем сигнал о готовности
+window.postMessage({
+  source: 'MEXC_TT',
+  type: 'EXTENSION_READY',
+  timestamp: Date.now()
+}, '*');
+
+console.log('[Content] Extension bridge ready');
