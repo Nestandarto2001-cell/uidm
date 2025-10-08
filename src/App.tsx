@@ -16,9 +16,11 @@ import { SymbolPickerModal } from './components/SymbolPickerModal';
 import { ProfileCreateModal } from './components/ProfileCreateModal';
 import { ExtensionPanel } from './components/ExtensionPanel';
 import TabNavigation from './components/TabNavigation';
+import DiagnosticModal from './components/DiagnosticModal';
+import Tooltip from './components/SimpleTooltip';
 
 // Lazy load heavy components
-const AssessmentZone = lazy(() => import('./components/AssessmentZone'));
+const AssessmentZone = lazy(() => import('./components/AssessmentZoneNew'));
 const ConnectionPage = lazy(() => import('./components/ConnectionPage'));
 import { Order } from './types';
 import { CONFIG, setApiCredentials, hasApiCredentials } from './config';
@@ -41,6 +43,7 @@ function App() {
   const [browserOrderBook, setBrowserOrderBook] = useState<any>(null);
   const [isSymbolPickerOpen, setIsSymbolPickerOpen] = useState(false);
   const [isExtensionPanelOpen, setIsExtensionPanelOpen] = useState(false);
+  const [isDiagnosticOpen, setIsDiagnosticOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'trading' | 'assessment' | 'connection'>('trading');
   
   // Используем профили из store
@@ -332,7 +335,7 @@ function App() {
           </>
                     ) : activeTab === 'assessment' ? (
                       <Suspense fallback={<div className="flex items-center justify-center h-64 text-gray-400">Загрузка Assessment Zone...</div>}>
-                        <AssessmentZone />
+                        <AssessmentZone onSymbolSelect={setSymbol} />
                       </Suspense>
                     ) : (
                       <Suspense fallback={<div className="flex items-center justify-center h-64 text-gray-400">Загрузка настроек подключения...</div>}>
@@ -355,6 +358,11 @@ function App() {
       />
       
       <ProfileCreateModal />
+      
+      <DiagnosticModal
+        isOpen={isDiagnosticOpen}
+        onClose={() => setIsDiagnosticOpen(false)}
+      />
     </div>
   );
 }

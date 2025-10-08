@@ -19,22 +19,4 @@ export default {
   plugins: [
     require('@tailwindcss/forms'),
   ],
-  // Purge unused styles in production
-  purge: {
-    enabled: process.env.NODE_ENV === 'production',
-    content: [
-      "./index.html",
-      "./src/**/*.{js,ts,jsx,tsx}",
-    ],
-    options: {
-      safelist: [
-        'bg-green-500',
-        'bg-red-500',
-        'text-green-500',
-        'text-red-500',
-        'border-green-500',
-        'border-red-500',
-      ],
-    },
-  },
 }

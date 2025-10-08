@@ -42,8 +42,7 @@
     ]
   },
   "background": {
-    "service_worker": "background.js",
-    "type": "module"
+    "service_worker": "background.js"
   },
   "declarative_net_request": {
     "rule_resources": [
